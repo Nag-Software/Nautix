@@ -3,15 +3,11 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import {
-  Anchor,
   BookOpen,
   Command,
-  Folder,
-  Gauge,
   LifeBuoy,
   MessageSquare,
   Send,
-  Settings2,
   Ship,
   Wrench,
 } from "lucide-react"
@@ -21,7 +17,6 @@ import type { User } from "@supabase/supabase-js"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
-import { NavConversations } from "@/components/nav-conversations"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { SupportDialog } from "@/components/support-dialog"
 import { FeedbackDialog } from "@/components/feedback-dialog"
@@ -34,8 +29,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Button } from "./ui/button"
-import { title } from "process"
 
 const data = {
   navMain: [
