@@ -1,65 +1,265 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Ai04 from "@/components/ai-04"
+import { AppSidebar } from "@/components/app-sidebar"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Separator } from "@/components/ui/separator"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import { useState } from "react"
+import { IconSparkles, IconUser } from "@tabler/icons-react"
+import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import { Toaster } from "sonner"
+
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+}
+
+interface AIAction {
+  type: "add_maintenance" | "add_reminder" | "suggest_document"
+  data: any
+  confirmationMessage: string
+}
+
+export default function Page() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  const executeAction = async (action: AIAction) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      toast.error("Du må være logget inn")
+      return false
+    }
+
+    try {
+      if (action.type === "add_maintenance") {
+        const { error } = await supabase
+          .from("maintenance_log")
+          .insert([{
+            ...action.data,
+            user_id: user.id,
+            status: action.data.status || "completed",
+            priority: action.data.priority || "medium",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }])
+
+        if (error) throw error
+        toast.success(action.confirmationMessage)
+        return true
+      } 
+      else if (action.type === "add_reminder") {
+        const reminderData: any = {
+          title: action.data.title,
+          description: action.data.description || null,
+          due_date: action.data.due_date,
+          priority: action.data.priority || "medium",
+          category: action.data.category || "annet",
+          user_id: user.id,
+          completed: false,
+          ai_suggested: action.data.ai_suggested || true,
+          recurrence: action.data.recurrence || "none",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        // Only add recurrence_interval if recurrence is custom
+        if (action.data.recurrence === "custom" && action.data.recurrence_interval) {
+          reminderData.recurrence_interval = action.data.recurrence_interval
+        }
+        
+        const { error } = await supabase
+          .from("reminders")
+          .insert([reminderData])
+
+        if (error) throw error
+        toast.success(action.confirmationMessage)
+        return true
+      }
+      else if (action.type === "suggest_document") {
+        // For now, just show a toast with the suggestion
+        toast.info(action.confirmationMessage, {
+          description: `${action.data.description}\n\nURL: ${action.data.url}`,
+          duration: 10000
+        })
+        return true
+      }
+    } catch (error) {
+      console.error("Error executing action:", error)
+      toast.error("Kunne ikke utføre handlingen")
+      return false
+    }
+
+    return false
+  }
+
+  const handleSubmit = async (prompt: string) => {
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: prompt,
+      timestamp: new Date()
+    }
+    
+    setMessages((prev) => [...prev, userMessage])
+    setIsLoading(true)
+
+    try {
+      // Send the last 5 messages for context
+      const recentMessages = [...messages, userMessage].slice(-5).map(m => ({
+        role: m.role,
+        content: m.content
+      }))
+      
+      const response = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          prompt,
+          chatHistory: recentMessages
+        })
+      })
+
+      const data = await response.json()
+      
+      // Execute actions if any
+      if (data.actions && Array.isArray(data.actions)) {
+        for (const action of data.actions) {
+          await executeAction(action)
+        }
+      }
+      
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.suggestion || "Beklager, jeg kunne ikke behandle forespørselen din.",
+        timestamp: new Date()
+      }
+      
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch (error) {
+      console.error("Error:", error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Beklager, det oppstod en feil. Prøv igjen senere.",
+        timestamp: new Date()
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="#">
+                    Nautix
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Samtale</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        </header>
+        <main className="flex flex-1 flex-col overflow-hidden">
+          {messages.length === 0 ? (
+            <div className="flex flex-1 justify-center mt-[15vh]">
+              <Ai04 onSubmit={handleSubmit} />
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-4 py-6">
+                <div className="mx-auto max-w-3xl space-y-6">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        "flex gap-4",
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      {message.role === "assistant" && (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
+                          <IconSparkles size={18} className="text-primary-foreground" />
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          "rounded-2xl px-4 py-3 max-w-[80%]",
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        )}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                      {message.role === "user" && (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                          <IconUser size={18} className="text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex gap-4">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
+                        <IconSparkles size={18} className="text-primary-foreground" />
+                      </div>
+                      <div className="rounded-2xl bg-muted px-4 py-3">
+                        <div className="flex gap-1">
+                          <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "0ms" }} />
+                          <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "150ms" }} />
+                          <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "300ms" }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="border-t bg-background p-4">
+                <div className="mx-auto max-w-3xl">
+                  <Ai04 onSubmit={handleSubmit} compact />
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </SidebarInset>
+      <Toaster richColors position="top-right" />
+    </SidebarProvider>
+  )
 }
