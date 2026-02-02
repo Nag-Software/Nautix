@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { MaintenanceLogDialog } from "@/components/maintenance-log-dialog";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +49,6 @@ interface AttachedFile {
 }
 
 const ACTIONS = [
-  { id: "logg-vedlikehold", icon: IconFileUpload, label: "Logg vedlikehold" },
   { id: "legg-til-dokument", icon: IconPaperclip, label: "Legg til dokument" },
   { id: "motor-info", icon: IconLayoutDashboard, label: "Motorinformasjon" },
   { id: "opprett-paaminnelse", icon: IconHistory, label: "Opprett påminnelse" },
@@ -67,7 +65,6 @@ export default function Ai04({
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [motorDialogOpen, setMotorDialogOpen] = useState(false);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
 
@@ -158,9 +155,6 @@ export default function Ai04({
 
   const handleActionClick = (actionId: string) => {
     switch (actionId) {
-      case "logg-vedlikehold":
-        setMaintenanceDialogOpen(true);
-        break;
       case "legg-til-dokument":
         fileInputRef.current?.click();
         break;
@@ -403,12 +397,6 @@ export default function Ai04({
       )}
 
       {/* Dialogs */}
-      <MaintenanceLogDialog
-        onSuccess={() => {
-          setMaintenanceDialogOpen(false);
-        }}
-      />
-
       <Dialog open={motorDialogOpen} onOpenChange={setMotorDialogOpen}>
         <DialogContent>
           <DialogHeader>

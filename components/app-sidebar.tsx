@@ -7,11 +7,8 @@ import {
   BookOpen,
   Command,
   Folder,
-  Frame,
   Gauge,
   LifeBuoy,
-  Map,
-  PieChart,
   Send,
   Settings2,
   Ship,
@@ -21,7 +18,6 @@ import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -137,23 +133,6 @@ const data = {
       icon: Send,
     },
   ],
-  projects: [
-    {
-      name: "Kommende...",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Kommende...",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Kommende...",
-      url: "#",
-      icon: Map,
-    },
-  ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -207,7 +186,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

@@ -19,10 +19,26 @@ Dette vil opprette:
 - **engines** tabell - for motordetaljer
 - **equipment** tabell - for utstyr og tilbehør
 - **documents** tabell - for dokumenter
-- **boat-documents** storage bucket - for filopplasting
 - Row Level Security (RLS) policies - for datasikkerhet
 
-### 3. Konfigurer Environment Variables
+### 3. Konfigurer Storage
+1. Gå til SQL Editor i Supabase Dashboard
+2. Åpne filen `supabase/storage.sql` i dette prosjektet
+3. Kopier hele SQL-koden
+4. Lim inn i Supabase SQL Editor
+5. Klikk "Run" for å kjøre scriptet
+
+Dette vil opprette:
+- **documents** storage bucket - for filopplasting
+- Storage policies - for sikker tilgang til filer
+
+**Alternativt (manuell oppsett):**
+1. Gå til Storage i Supabase Dashboard
+2. Opprett en ny bucket kalt "documents"
+3. Sett "Public bucket" til OFF (private)
+4. Policies vil bli opprettet automatisk av SQL-scriptet
+
+### 4. Konfigurer Environment Variables
 1. I Supabase Dashboard, gå til Settings > API
 2. Kopier "Project URL" og "anon public" nøkkelen
 3. Oppdater `.env.local` filen:
@@ -59,10 +75,13 @@ For å aktivere brukerautentisering:
    - Kategorisering og statistikk
 
 4. **Dokumenter** (`/min-bat/dokumenter`)
-   - Filopplasting til Supabase Storage
-   - Dokumenthåndtering
-   - Utløpsdato tracking
-   - Last ned dokumenter
+   - Filopplasting til Supabase Storage med drag & drop
+   - Full CRUD funksjonalitet
+   - Dokumenthåndtering med metadata
+   - Utløpsdato tracking og status badges
+   - Last ned og slett dokumenter
+   - Mobile-first responsivt design
+   - Dialog for opplasting
 
 ### Vedlikehold
 1. **Logg** (`/vedlikehold/logg`)
