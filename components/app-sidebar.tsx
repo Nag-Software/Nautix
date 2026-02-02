@@ -9,6 +9,7 @@ import {
   Folder,
   Gauge,
   LifeBuoy,
+  MessageSquare,
   Send,
   Settings2,
   Ship,
@@ -20,7 +21,10 @@ import type { User } from "@supabase/supabase-js"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+import { NavConversations } from "@/components/nav-conversations"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { SupportDialog } from "@/components/support-dialog"
+import { FeedbackDialog } from "@/components/feedback-dialog"
 import {
   Sidebar,
   SidebarContent,
@@ -36,10 +40,15 @@ import { title } from "process"
 const data = {
   navMain: [
     {
+      title: "Samtaler",
+      url: "/samtaler",
+      icon: MessageSquare,
+      isActive: true,
+    },
+    {
       title: "Min båt",
       url: "#",
       icon: Ship,
-      isActive: true,
       items: [
         {
           title: "Båtinformasjon",
@@ -75,69 +84,50 @@ const data = {
       ],
     },
     {
-      title: "Hjelp (kommende)",
+      title: "Hjelp",
       url: "#",
       icon: BookOpen,
       items: [
         {
           title: "Introduksjon",
-          url: "#",
+          url: "/hjelp/introduksjon",
         },
         {
           title: "Kom i gang",
-          url: "#",
+          url: "/hjelp/kom-i-gang",
         },
         {
           title: "Veiledninger",
-          url: "#",
+          url: "/hjelp/veiledninger",
         },
         {
           title: "Endringslogg",
-          url: "#",
+          url: "/hjelp/endringslogg",
         },
       ],
-    },
-    {
-      title: "Innstillinger",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "Generelt",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Fakturering",
-          url: "#",
-        },
-        {
-          title: "Grenser",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Support",
-      url: "#",
-      icon: LifeBuoy,
-    },
-    {
-      title: "Tilbakemelding",
-      url: "#",
-      icon: Send,
     },
   ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [user, setUser] = useState<User | null>(null)
+  const [supportOpen, setSupportOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const supabase = createClient()
+
+  const navSecondary = [
+    {
+      title: "Support",
+      icon: LifeBuoy,
+      onClick: () => setSupportOpen(true),
+    },
+    {
+      title: "Tilbakemelding",
+      icon: Send,
+      onClick: () => setFeedbackOpen(true),
+    },
+  ]
 
   useEffect(() => {
     const getUser = async () => {
@@ -165,32 +155,37 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
-    <Sidebar variant="inset" {...props}>
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <a href="#">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Command className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Nautix</span>
-                  <span className="truncate text-xs">Digital båtassistent</span>
-                </div>
-                <ThemeToggle />
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
-      </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={userData} />
-      </SidebarFooter>
-    </Sidebar>
+    <>
+      <Sidebar variant="inset" {...props}>
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <a href="#">
+                  <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                    <Command className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">Nautix</span>
+                    <span className="truncate text-xs">Digital båtassistent</span>
+                  </div>
+                  <ThemeToggle />
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <NavMain items={data.navMain} />
+          <NavSecondary items={navSecondary} className="mt-auto" />
+        </SidebarContent>
+        <SidebarFooter>
+          <NavUser user={userData} />
+        </SidebarFooter>
+      </Sidebar>
+      
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+    </>
   )
 }

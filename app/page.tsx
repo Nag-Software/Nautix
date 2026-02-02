@@ -39,6 +39,7 @@ interface AIAction {
 export default function Page() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
 
   const executeAction = async (action: AIAction) => {
     const supabase = createClient()
@@ -112,6 +113,13 @@ export default function Page() {
   }
 
   const handleSubmit = async (prompt: string) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      toast.error("Du må være logget inn")
+      return
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -123,6 +131,28 @@ export default function Page() {
     setIsLoading(true)
 
     try {
+      // Ensure a conversation exists
+      let activeConversationId = conversationId
+      if (!activeConversationId) {
+        const title = prompt.trim().slice(0, 80)
+        const { data: createdConv, error: createConvError } = await supabase
+          .from("conversations")
+          .insert([{ user_id: user.id, title, archived: false }])
+          .select("id")
+          .single()
+
+        if (createConvError) throw createConvError
+        activeConversationId = createdConv.id as string
+        setConversationId(activeConversationId)
+      }
+
+      // Persist user message
+      const { error: insertUserMsgError } = await supabase
+        .from("messages")
+        .insert([{ conversation_id: activeConversationId, user_id: user.id, role: "user", content: prompt }])
+
+      if (insertUserMsgError) throw insertUserMsgError
+
       // Send the last 5 messages for context
       const recentMessages = [...messages, userMessage].slice(-5).map(m => ({
         role: m.role,
@@ -155,6 +185,17 @@ export default function Page() {
       }
       
       setMessages((prev) => [...prev, assistantMessage])
+
+      // Persist assistant message and bump conversation updated_at
+      const { error: insertAssistantMsgError } = await supabase
+        .from("messages")
+        .insert([{ conversation_id: activeConversationId!, user_id: user.id, role: "assistant", content: assistantMessage.content }])
+      if (insertAssistantMsgError) throw insertAssistantMsgError
+
+      await supabase
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", activeConversationId!)
     } catch (error) {
       console.error("Error:", error)
       const errorMessage: Message = {
@@ -167,6 +208,11 @@ export default function Page() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const startNewConversation = () => {
+    setConversationId(null)
+    setMessages([])
   }
 
   return (
@@ -252,6 +298,14 @@ export default function Page() {
               </div>
               <div className="border-t bg-background p-4">
                 <div className="mx-auto max-w-3xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-muted-foreground">
+                      {conversationId ? "Aktiv samtale lagres automatisk" : "Ny samtale opprettes ved første melding"}
+                    </div>
+                    {messages.length > 0 && (
+                      <button className="text-xs underline" onClick={startNewConversation}>Start ny samtale</button>
+                    )}
+                  </div>
                   <Ai04 onSubmit={handleSubmit} compact />
                 </div>
               </div>

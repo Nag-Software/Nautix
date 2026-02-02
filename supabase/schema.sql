@@ -227,6 +227,7 @@ CREATE TABLE reminders (
   category VARCHAR(100), -- motor, skrog, sikkerhet, sesong, annet
   completed BOOLEAN DEFAULT false,
   completed_at TIMESTAMP WITH TIME ZONE,
+  archived BOOLEAN DEFAULT false, -- om påminnelsen er arkivert
   recurrence VARCHAR(50), -- none, monthly, quarterly, yearly, custom
   recurrence_interval INTEGER, -- antall dager for custom recurrence
   ai_suggested BOOLEAN DEFAULT false, -- om påminnelsen ble generert av AI
@@ -281,3 +282,121 @@ CREATE INDEX idx_reminders_user_id ON reminders(user_id);
 CREATE INDEX idx_reminders_boat_id ON reminders(boat_id);
 CREATE INDEX idx_reminders_due_date ON reminders(due_date);
 CREATE INDEX idx_reminders_completed ON reminders(completed);
+-- Support Tickets table
+CREATE TABLE support_tickets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_email VARCHAR(255) NOT NULL,
+  subject VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(50) DEFAULT 'open', -- open, in-progress, resolved, closed
+  priority VARCHAR(50) DEFAULT 'normal', -- low, normal, high, urgent
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Feedback table
+CREATE TABLE feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- kan være null for anonym feedback
+  user_email VARCHAR(255),
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  message TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Support Tickets RLS
+ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own support tickets"
+  ON support_tickets FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own support tickets"
+  ON support_tickets FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own support tickets"
+  ON support_tickets FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- Feedback RLS (brukere kan se egen feedback, anonym feedback er skrivbar av alle)
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own feedback"
+  ON feedback FOR SELECT
+  USING (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Anyone can submit feedback"
+  ON feedback FOR INSERT
+  WITH CHECK (true);
+
+-- Indexes for support and feedback
+CREATE INDEX idx_support_tickets_user_id ON support_tickets(user_id);
+CREATE INDEX idx_support_tickets_status ON support_tickets(status);
+CREATE INDEX idx_support_tickets_created_at ON support_tickets(created_at);
+CREATE INDEX idx_feedback_user_id ON feedback(user_id);
+CREATE INDEX idx_feedback_rating ON feedback(rating);
+CREATE INDEX idx_feedback_created_at ON feedback(created_at);
+
+-- AI Conversations table
+CREATE TABLE conversations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  archived BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- AI Messages table
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role VARCHAR(50) NOT NULL, -- user, assistant
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Conversations RLS
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own conversations"
+  ON conversations FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own conversations"
+  ON conversations FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own conversations"
+  ON conversations FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own conversations"
+  ON conversations FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Messages RLS
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own messages"
+  ON messages FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own messages"
+  ON messages FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own messages"
+  ON messages FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Indexes for conversations and messages
+CREATE INDEX idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX idx_conversations_archived ON conversations(archived);
+CREATE INDEX idx_conversations_updated_at ON conversations(updated_at);
+CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX idx_messages_user_id ON messages(user_id);
+CREATE INDEX idx_messages_created_at ON messages(created_at);

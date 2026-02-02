@@ -226,7 +226,7 @@ export default function Ai04({
             </div>
           )}
           <Textarea
-            className="max-h-100 min-h-12 resize-none rounded-none border-none bg-transparent! p-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
+            className="max-h-100 min-h-12 resize-none rounded-none border-none bg-transparent! p-1 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
             placeholder="Hva lurer du på?"

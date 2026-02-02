@@ -21,9 +21,20 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -53,6 +64,8 @@ import {
   Loader2,
   Trash2,
   RotateCcw,
+  Plus,
+  Archive,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -66,6 +79,7 @@ interface Reminder {
   priority: "high" | "medium" | "low"
   category: string
   completed: boolean
+  archived: boolean
   ai_suggested: boolean
   maintenance_log_id?: string
 }
@@ -84,6 +98,16 @@ export default function RemindersPage() {
   const [loading, setLoading] = useState(true)
   const [pendingAction, setPendingAction] = useState<{ id: string; type: string } | null>(null)
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
+  const [newReminderOpen, setNewReminderOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
+  const [newReminderData, setNewReminderData] = useState({
+    title: "",
+    description: "",
+    due_date: "",
+    priority: "medium" as "high" | "medium" | "low",
+    category: "annet",
+  })
 
   const fetchReminders = async () => {
     setLoading(true)
@@ -122,6 +146,71 @@ export default function RemindersPage() {
     }
   }
 
+  const createReminder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreating(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error("Du må være logget inn")
+        return
+      }
+
+      // Get or create boat
+      let { data: boats } = await supabase
+        .from("boats")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1)
+
+      let boatId: string
+
+      if (!boats || boats.length === 0) {
+        const { data: newBoat, error: boatError } = await supabase
+          .from("boats")
+          .insert([{ user_id: user.id }])
+          .select("id")
+          .single()
+
+        if (boatError) throw boatError
+        boatId = newBoat.id
+      } else {
+        boatId = boats[0].id
+      }
+
+      const { error } = await supabase.from("reminders").insert([{
+        boat_id: boatId,
+        user_id: user.id,
+        title: newReminderData.title,
+        description: newReminderData.description,
+        due_date: newReminderData.due_date,
+        priority: newReminderData.priority,
+        category: newReminderData.category,
+        completed: false,
+        ai_suggested: false,
+      }])
+
+      if (error) throw error
+
+      toast.success("Påminnelse opprettet")
+      setNewReminderOpen(false)
+      setNewReminderData({
+        title: "",
+        description: "",
+        due_date: "",
+        priority: "medium",
+        category: "annet",
+      })
+      fetchReminders()
+    } catch (error) {
+      console.error("Error creating reminder:", error)
+      toast.error("Kunne ikke opprette påminnelse")
+    } finally {
+      setCreating(false)
+    }
+  }
+
   useEffect(() => {
     fetchReminders()
   }, [])
@@ -131,23 +220,34 @@ export default function RemindersPage() {
     
     try {
       const supabase = createClient()
+      
+      // Build update object conditionally
+      const updateData: any = {
+        completed: !currentStatus,
+        completed_at: !currentStatus ? new Date().toISOString() : null
+      }
+      
+      // Only add archived when completing, not when uncompleting
+      if (!currentStatus) {
+        updateData.archived = true
+      } else {
+        updateData.archived = false
+      }
+      
       const { error } = await supabase
         .from("reminders")
-        .update({ 
-          completed: !currentStatus,
-          completed_at: !currentStatus ? new Date().toISOString() : null
-        })
+        .update(updateData)
         .eq("id", id)
 
       if (error) throw error
 
       setReminders(reminders.map(reminder => 
         reminder.id === id 
-          ? { ...reminder, completed: !currentStatus }
+          ? { ...reminder, completed: !currentStatus, archived: !currentStatus }
           : reminder
       ))
       
-      toast.success(!currentStatus ? "Påminnelse fullført" : "Påminnelse gjenåpnet")
+      toast.success(!currentStatus ? "Påminnelse fullført og arkivert" : "Påminnelse gjenåpnet")
     } catch (error) {
       console.error("Error toggling reminder:", error)
       toast.error("Kunne ikke oppdatere påminnelse")
@@ -178,8 +278,10 @@ export default function RemindersPage() {
     }
   }
 
-  const activeReminders = reminders.filter(r => !r.completed)
+  const activeReminders = reminders.filter(r => !r.completed && !r.archived)
   const completedReminders = reminders.filter(r => r.completed)
+  const archivedReminders = reminders.filter(r => r.archived)
+  const displayedReminders = showArchived ? archivedReminders : activeReminders
   const highPriorityCount = activeReminders.filter(r => r.priority === "high").length
 
   const getPriorityColor = (priority: string) => {
@@ -339,14 +441,28 @@ export default function RemindersPage() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col w-full mx-auto max-w-5xl gap-6 p-4 md:p-6 lg:p-8">
+        <main className="flex flex-1 flex-col w-full mx-auto max-w-6xl gap-6 p-4 md:p-6 lg:p-8">
           <div className="w-full space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Vedlikeholdspåminnelser</h1>
                 <p className="text-muted-foreground">
                   Hold oversikt over kommende vedlikehold og viktige oppgaver
                 </p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant={showArchived ? "default" : "outline"}
+                  onClick={() => setShowArchived(!showArchived)} 
+                  className="shrink-0"
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  {showArchived ? "Vis aktive" : "Vis arkiv"}
+                </Button>
+                <Button onClick={() => setNewReminderOpen(true)} className="shrink-0">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Ny påminnelse
+                </Button>
               </div>
             </div>
 
@@ -368,10 +484,10 @@ export default function RemindersPage() {
               </div>
               <div className="rounded-lg border p-3 md:p-4">
                 <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-600" />
-                  <span className="truncate">Fullført</span>
+                  <Archive className="h-3.5 w-3.5 md:h-4 md:w-4 text-gray-600" />
+                  <span className="truncate">Arkiv</span>
                 </div>
-                <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-green-600">{completedReminders.length}</div>
+                <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-gray-600">{archivedReminders.length}</div>
               </div>
               <div className="rounded-lg border p-3 md:p-4">
                 <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
@@ -383,11 +499,11 @@ export default function RemindersPage() {
             </div>
 
             {/* Reminders List/Table */}
-            {reminders.length > 0 ? (
+            {displayedReminders.length > 0 ? (
               <>
                 {/* Mobile List */}
                 <div className="md:hidden space-y-2">
-                  {reminders.map((reminder) => {
+                  {displayedReminders.map((reminder) => {
                     const Icon = categoryIcons[reminder.category] || Anchor
                     return (
                       <div
@@ -457,7 +573,7 @@ export default function RemindersPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reminders.map((reminder) => {
+                      {displayedReminders.map((reminder) => {
                         const Icon = categoryIcons[reminder.category] || Anchor
                         const busy = isReminderBusy(reminder.id)
                         const completePending = isActionPending(reminder.id, "complete")
@@ -603,11 +719,23 @@ export default function RemindersPage() {
               </>
           ) : (
             <div className="rounded-lg border border-dashed p-8 text-center">
-              <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-              <h3 className="text-lg font-semibold mb-2">Ingen påminnelser</h3>
-              <p className="text-muted-foreground">
-                Du har ingen påminnelser ennå. AI-assistenten vil automatisk opprette påminnelser når du logger vedlikehold.
-              </p>
+              {showArchived ? (
+                <>
+                  <Archive className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                  <h3 className="text-lg font-semibold mb-2">Arkivet er tomt</h3>
+                  <p className="text-muted-foreground">
+                    Fullf\u00f8rte p\u00e5minnelser vil vises her.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                  <h3 className="text-lg font-semibold mb-2">Ingen aktive p\u00e5minnelser</h3>
+                  <p className="text-muted-foreground">
+                    Du har ingen aktive p\u00e5minnelser enn\u00e5. AI-assistenten vil automatisk opprette p\u00e5minnelser n\u00e5r du logger vedlikehold.
+                  </p>
+                </>
+              )}
             </div>
           )}
           </div>
@@ -743,6 +871,106 @@ export default function RemindersPage() {
               </>
             )
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* New Reminder Dialog */}
+      <Dialog open={newReminderOpen} onOpenChange={setNewReminderOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ny påminnelse</DialogTitle>
+            <DialogDescription>
+              Opprett en ny vedlikeholdspåminnelse for båten din
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={createReminder} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Tittel *</Label>
+              <Input
+                id="title"
+                placeholder="F.eks. Skifte motorolje"
+                value={newReminderData.title}
+                onChange={(e) => setNewReminderData({ ...newReminderData, title: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Beskrivelse</Label>
+              <Textarea
+                id="description"
+                placeholder="Ytterligere detaljer..."
+                value={newReminderData.description}
+                onChange={(e) => setNewReminderData({ ...newReminderData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Kategori *</Label>
+                <Select
+                  value={newReminderData.category}
+                  onValueChange={(value) => setNewReminderData({ ...newReminderData, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="motor">Motor</SelectItem>
+                    <SelectItem value="skrog">Skrog</SelectItem>
+                    <SelectItem value="elektrisitet">Elektrisitet</SelectItem>
+                    <SelectItem value="sikkerhet">Sikkerhet</SelectItem>
+                    <SelectItem value="sesong">Sesong</SelectItem>
+                    <SelectItem value="annet">Annet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priority">Prioritet *</Label>
+                <Select
+                  value={newReminderData.priority}
+                  onValueChange={(value) => setNewReminderData({ ...newReminderData, priority: value as "high" | "medium" | "low" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">Høy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Lav</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="due_date">Forfallsdato *</Label>
+              <Input
+                id="due_date"
+                type="date"
+                value={newReminderData.due_date}
+                onChange={(e) => setNewReminderData({ ...newReminderData, due_date: e.target.value })}
+                required
+              />
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNewReminderOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Avbryt
+              </Button>
+              <Button type="submit" disabled={creating} className="w-full sm:w-auto">
+                {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Opprett påminnelse
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
