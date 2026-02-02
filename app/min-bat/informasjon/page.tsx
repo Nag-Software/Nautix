@@ -258,12 +258,25 @@ export default function BatInformasjonPage() {
     setAutofillSuggestions(null)
   }
 
-  const handleReset = async () => {
+  const handleReset = () => {
     setShowAutofillPrompt(false)
     setAutofillSuggestions(null)
     setSuggestion(null)
     setMessage(null)
-    await loadBoatData()
+    setBoatData({
+      ...boatData,
+      name: "",
+      type: "",
+      manufacturer: "",
+      model: "",
+      year: "",
+      registration_number: "",
+      length_meters: "",
+      width_meters: "",
+      weight_kg: "",
+      hull_material: "",
+      hull_color: "",
+    })
   }
 
   if (loading) {
@@ -347,7 +360,7 @@ export default function BatInformasjonPage() {
                     <div className="space-y-1.5 rounded-md bg-muted/50 p-3">
                       {Object.entries(autofillSuggestions).map(([key, value]) => {
                         const labels: Record<string, string> = {
-                          length_meters: 'Lengde (fot)',
+                          length_meters: 'Lengde (m)',
                           width_meters: 'Bredde (m)',
                           weight_kg: 'Vekt (kg)',
                           hull_material: 'Skrogmateriale',
@@ -422,7 +435,7 @@ export default function BatInformasjonPage() {
                   <AIInputWrapper
                     id="manufacturer" 
                     field="manufacturer"
-                    placeholder="F.eks: Yamarin" 
+                    placeholder="F.eks: Nordkapp" 
                     value={boatData.manufacturer}
                     onValueChange={(value) => handleChange('manufacturer', value)}
                     triggerFields={{
@@ -479,12 +492,12 @@ export default function BatInformasjonPage() {
 
               <div className="grid gap-6 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="length">Lengde (fot)</Label>
+                  <Label htmlFor="length">Lengde (m)</Label>
                   <Input 
                     id="length" 
                     type="number" 
                     step="0.1" 
-                    placeholder="F.eks: 21.3" 
+                    placeholder="F.eks: 33" 
                     value={boatData.length_meters}
                     onChange={(e) => handleChange('length_meters', e.target.value)}
                   />

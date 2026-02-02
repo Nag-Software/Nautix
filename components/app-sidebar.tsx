@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState, useEffect } from "react"
 import {
   Anchor,
   BookOpen,
@@ -16,6 +17,8 @@ import {
   Ship,
   Wrench,
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
@@ -35,11 +38,6 @@ import { Button } from "./ui/button"
 import { title } from "process"
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Min båt",
@@ -81,40 +79,35 @@ const data = {
       ],
     },
     {
-      title: "Dokumenter",
-      url: "#",
-      icon: Folder,
-    },
-    {
-      title: "Documentation",
+      title: "Hjelp (kommende)",
       url: "#",
       icon: BookOpen,
       items: [
         {
-          title: "Introduction",
+          title: "Introduksjon",
           url: "#",
         },
         {
-          title: "Get Started",
+          title: "Kom i gang",
           url: "#",
         },
         {
-          title: "Tutorials",
+          title: "Veiledninger",
           url: "#",
         },
         {
-          title: "Changelog",
+          title: "Endringslogg",
           url: "#",
         },
       ],
     },
     {
-      title: "Settings",
+      title: "Innstillinger",
       url: "#",
       icon: Settings2,
       items: [
         {
-          title: "General",
+          title: "Generelt",
           url: "#",
         },
         {
@@ -122,11 +115,11 @@ const data = {
           url: "#",
         },
         {
-          title: "Billing",
+          title: "Fakturering",
           url: "#",
         },
         {
-          title: "Limits",
+          title: "Grenser",
           url: "#",
         },
       ],
@@ -139,24 +132,24 @@ const data = {
       icon: LifeBuoy,
     },
     {
-      title: "Feedback",
+      title: "Tilbakemelding",
       url: "#",
       icon: Send,
     },
   ],
   projects: [
     {
-      name: "Design Engineering",
+      name: "Kommende...",
       url: "#",
       icon: Frame,
     },
     {
-      name: "Sales & Marketing",
+      name: "Kommende...",
       url: "#",
       icon: PieChart,
     },
     {
-      name: "Travel",
+      name: "Kommende...",
       url: "#",
       icon: Map,
     },
@@ -164,6 +157,34 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [user, setUser] = useState<User | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+
+    getUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const userData = user ? {
+    name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Bruker',
+    email: user.email || '',
+    avatar: user.user_metadata?.avatar_url || '',
+  } : {
+    name: 'Gjestebruker',
+    email: '',
+    avatar: '',
+  }
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -176,7 +197,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">Nautix</span>
-                  <span className="truncate text-xs">Hjelp på sjøen</span>
+                  <span className="truncate text-xs">Digital båtassistent</span>
                 </div>
                 <ThemeToggle />
               </a>
@@ -190,7 +211,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
   )

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { ChevronRight, type LucideIcon } from "lucide-react"
 
 import {
@@ -34,16 +35,27 @@ export function NavMain({
     }[]
   }[]
 }) {
+  const [openItem, setOpenItem] = useState<string | null>(
+    items.find((item) => item.isActive)?.title || null
+  )
+
   return (
     <SidebarGroup>
       <Button variant="outline" className="mb-2 p-0" onClick={() => window.location.href = "/"}>Ny samtale</Button>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
-          <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
+          <Collapsible 
+            key={item.title} 
+            asChild 
+            open={openItem === item.title}
+            onOpenChange={(isOpen) => {
+              setOpenItem(isOpen ? item.title : null)
+            }}
+          >
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip={item.title}>
+                <SidebarMenuButton tooltip={item.title} className="cursor-pointer">
                   <item.icon />
                   <span>{item.title}</span>
                   {item.items?.length ? (

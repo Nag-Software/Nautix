@@ -35,7 +35,7 @@ export default function Page() {
                         </Breadcrumb>
                     </div>
                 </header>
-
+                
                 <main className="flex flex-1 flex-col w-full mx-auto max-w-5xl gap-6 p-4 md:p-6 lg:p-8">
                     <div className="w-full space-y-6">
                         <div className="flex items-center justify-between">

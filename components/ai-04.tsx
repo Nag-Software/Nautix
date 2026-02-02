@@ -13,6 +13,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { MaintenanceLogDialog } from "@/components/maintenance-log-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   IconAdjustmentsHorizontal,
   IconArrowUp,
@@ -42,10 +50,10 @@ interface AttachedFile {
 }
 
 const ACTIONS = [
-  { id: "clone-screenshot", icon: IconCamera, label: "Clone a Screenshot" },
-  { id: "import-figma", icon: IconBrandFigma, label: "Import from Figma" },
-  { id: "upload-project", icon: IconFileUpload, label: "Upload a Project" },
-  { id: "landing-page", icon: IconLayoutDashboard, label: "Landing Page" },
+  { id: "logg-vedlikehold", icon: IconFileUpload, label: "Logg vedlikehold" },
+  { id: "legg-til-dokument", icon: IconPaperclip, label: "Legg til dokument" },
+  { id: "motor-info", icon: IconLayoutDashboard, label: "Motorinformasjon" },
+  { id: "opprett-paaminnelse", icon: IconHistory, label: "Opprett påminnelse" },
 ];
 
 export default function Ai04({
@@ -59,6 +67,9 @@ export default function Ai04({
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [motorDialogOpen, setMotorDialogOpen] = useState(false);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
 
   const [settings, setSettings] = useState({
     autoComplete: true,
@@ -143,6 +154,23 @@ export default function Ai04({
 
   const handleRemoveFile = (fileId: string) => {
     setAttachedFiles((prev) => prev.filter((file) => file.id !== fileId));
+  };
+
+  const handleActionClick = (actionId: string) => {
+    switch (actionId) {
+      case "logg-vedlikehold":
+        setMaintenanceDialogOpen(true);
+        break;
+      case "legg-til-dokument":
+        fileInputRef.current?.click();
+        break;
+      case "motor-info":
+        setMotorDialogOpen(true);
+        break;
+      case "opprett-paaminnelse":
+        setReminderDialogOpen(true);
+        break;
+    }
   };
 
   return (
@@ -365,6 +393,7 @@ export default function Ai04({
               key={action.id}
               size="sm"
               variant="outline"
+              onClick={() => handleActionClick(action.id)}
             >
               <action.icon size={16} />
               {action.label}
@@ -372,6 +401,105 @@ export default function Ai04({
           ))}
         </div>
       )}
+
+      {/* Dialogs */}
+      <MaintenanceLogDialog
+        onSuccess={() => {
+          setMaintenanceDialogOpen(false);
+        }}
+      />
+
+      <Dialog open={motorDialogOpen} onOpenChange={setMotorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Motorinformasjon</DialogTitle>
+            <DialogDescription>
+              Legg til eller oppdater informasjon om båtens motor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="motor-model">Motormodell</Label>
+              <input
+                id="motor-model"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="F.eks. Yamaha 150"
+              />
+            </div>
+            <div>
+              <Label htmlFor="motor-hours">Motortimer</Label>
+              <input
+                id="motor-hours"
+                type="number"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Timer"
+              />
+            </div>
+            <div>
+              <Label htmlFor="motor-year">Årsmodell</Label>
+              <input
+                id="motor-year"
+                type="number"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="År"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setMotorDialogOpen(false)}>
+              Avbryt
+            </Button>
+            <Button onClick={() => setMotorDialogOpen(false)}>
+              Lagre
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reminderDialogOpen} onOpenChange={setReminderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opprett påminnelse</DialogTitle>
+            <DialogDescription>
+              Sett opp en påminnelse for vedlikehold av båten.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="reminder-title">Tittel</Label>
+              <input
+                id="reminder-title"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="F.eks. Oljeskift"
+              />
+            </div>
+            <div>
+              <Label htmlFor="reminder-date">Dato</Label>
+              <input
+                id="reminder-date"
+                type="date"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <Label htmlFor="reminder-notes">Notater</Label>
+              <Textarea
+                id="reminder-notes"
+                placeholder="Legg til notater..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setReminderDialogOpen(false)}>
+              Avbryt
+            </Button>
+            <Button onClick={() => setReminderDialogOpen(false)}>
+              Opprett
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

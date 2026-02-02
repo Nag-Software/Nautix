@@ -236,11 +236,25 @@ export default function MotorPage() {
     setAutofillSuggestions(null)
   }
 
-  const handleReset = async () => {
+  const handleReset = () => {
     setShowAutofillPrompt(false)
     setAutofillSuggestions(null)
     setMessage(null)
-    await loadEngineData()
+    setEngineData({
+      ...engineData,
+      manufacturer: "",
+      model: "",
+      horsepower: "",
+      year: "",
+      serial_number: "",
+      engine_type: "",
+      fuel_type: "",
+      tank_capacity_liters: "",
+      fuel_consumption_lph: "",
+      propeller: "",
+      oil_type: "",
+      notes: "",
+    })
   }
 
   if (loading) {
