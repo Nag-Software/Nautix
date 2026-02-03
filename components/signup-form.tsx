@@ -19,6 +19,7 @@ export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -51,6 +52,9 @@ export function SignupForm({
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: name,
+          }
         }
       })
 
@@ -88,6 +92,18 @@ export function SignupForm({
                 </div>
               )}
 
+              <Field>
+                <FieldLabel htmlFor="name">Navn</FieldLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Ditt navn"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={success}
+                />
+              </Field>
               <Field>
                 <FieldLabel htmlFor="email">E-post</FieldLabel>
                 <Input

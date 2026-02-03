@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -42,12 +42,27 @@ export function AccountSettingsSheet({
   const router = useRouter()
   const supabase = createClient()
 
-  const [name, setName] = useState(user.name)
-  const [email, setEmail] = useState(user.email)
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Hent faktiske brukerdata fra Supabase når komponenten åpnes
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (open) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (currentUser) {
+          const displayName = currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || ""
+          setName(displayName)
+          setEmail(currentUser.email || "")
+        }
+      }
+    }
+    loadUserData()
+  }, [open, supabase])
 
   const handleUpdateProfile = async () => {
     setIsUpdating(true)
@@ -72,6 +87,14 @@ export function AccountSettingsSheet({
         toast.success("Bekreftelseslenke sendt til ny e-post")
       } else {
         toast.success("Profil oppdatert")
+      }
+
+      // Oppdater lokal state
+      const { data: { user: updatedUser } } = await supabase.auth.getUser()
+      if (updatedUser) {
+        const displayName = updatedUser.user_metadata?.full_name || updatedUser.email?.split('@')[0] || ""
+        setName(displayName)
+        setEmail(updatedUser.email || "")
       }
 
       // Refresh the page to update UI
