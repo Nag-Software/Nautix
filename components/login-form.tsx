@@ -11,10 +11,20 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { toast } from "sonner"
 
 export function LoginForm({
   className,
@@ -24,6 +34,8 @@ export function LoginForm({
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [sendingReset, setSendingReset] = useState(false)
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -46,6 +58,29 @@ export function LoginForm({
       setError(err.message || "Kunne ikke logge inn")
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) {
+      toast.error("Skriv inn e-postadressen din")
+      return
+    }
+    try {
+      setSendingReset(true)
+      const supabase = createClient()
+      const redirectTo = `${window.location.origin}/reset-password`
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      })
+      if (error) throw error
+      toast.success("Hvis e-posten finnes, er lenke sendt")
+      setForgotOpen(false)
+    } catch (err: any) {
+      toast.error(err.message || "Kunne ikke sende e-post for tilbakestilling")
+    } finally {
+      setSendingReset(false)
     }
   }
   return (
@@ -81,12 +116,46 @@ export function LoginForm({
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Passord</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto text-sm underline-offset-2 hover:underline"
-                  >
-                    Glemt passord?
-                  </a>
+                  <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="ml-auto text-sm underline-offset-2 hover:underline"
+                      >
+                        Glemt passord?
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Tilbakestill passord</DialogTitle>
+                        <DialogDescription>
+                          Vi sender deg en e-post med lenke for å velge nytt passord.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handlePasswordReset} className="grid gap-4">
+                        <Field>
+                          <FieldLabel htmlFor="reset-email">E-post</FieldLabel>
+                          <Input
+                            id="reset-email"
+                            type="email"
+                            placeholder="din@epost.no"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                          />
+                        </Field>
+                        <DialogFooter>
+                          <Button
+                            type="submit"
+                            disabled={sendingReset}
+                            className="w-full"
+                          >
+                            {sendingReset ? "Sender..." : "Send tilbakestillingslenke"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <Input 
                   id="password" 
@@ -121,7 +190,7 @@ export function LoginForm({
             <img
               src="/login-image.jpg"
               alt="Nautix - Båtadministrasjon"
-              className="absolute opacity-85 inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              className="absolute opacity-90 inset-0 h-full w-full object-cover dark:brightness-90"
             />
           </div>
         </CardContent>

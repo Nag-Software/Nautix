@@ -141,7 +141,7 @@ export function SignupForm({
             <img
               src="/login-image.jpg"
               alt="Nautix - Båtadministrasjon"
-              className="absolute opacity-85 inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              className="absolute opacity-90 inset-0 h-full w-full object-cover dark:brightness-90"
             />
           </div>
         </CardContent>
