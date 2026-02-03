@@ -6,10 +6,168 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+async function validateUrl(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout
+
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Nautix-Bot/1.0',
+      },
+    })
+
+    clearTimeout(timeoutId)
+    return response.ok
+  } catch (error) {
+    // If HEAD fails, try GET with timeout
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Nautix-Bot/1.0',
+        },
+      })
+
+      clearTimeout(timeoutId)
+      return response.ok
+    } catch {
+      return false
+    }
+  }
+}
+
+function shouldUseWebSearchForPrompt(prompt: string): boolean {
+  const p = (prompt || '').toLowerCase()
+  if (!p.trim()) return false
+
+  // Trigger web search when user asks for verifiable facts, manuals, dimensions, part numbers, or sources.
+  const keywords = [
+    // Norwegian
+    'manual',
+    'brukermanual',
+    'brukerhåndbok',
+    'brukerhandbok',
+    'håndbok',
+    'handbok',
+    'bruksanvisning',
+    'servicemanual',
+    'service manual',
+    'verkstedmanual',
+    'verksted',
+    'dokument',
+    'pdf',
+    'last ned',
+    'laste ned',
+    'nedlasting',
+    'sprengskisse',
+    'dele',
+    'delenummer',
+    'parts',
+    'part number',
+    'spesifikasjon',
+    'tekniske data',
+    'datablad',
+    'mål',
+    'målene',
+    'dimensjon',
+    'dimensjoner',
+    'vindskjerm',
+    'windscreen',
+    'tegning',
+    'drawing',
+    'diagram',
+    'kilder',
+    'lenke',
+    'link',
+    // English
+    'spec',
+    'specs',
+    'dimensions',
+    'datasheet',
+    'owner\'s manual',
+    'user manual',
+    'service guide',
+    'download',
+  ]
+
+  if (keywords.some((k) => p.includes(k))) return true
+
+  // If the user explicitly asks to "find" something external, prefer web search.
+  if (p.includes('finn') && (p.includes('på nett') || p.includes('på internett') || p.includes('online'))) return true
+  if (p.includes('hvor finner') || p.includes('hvor kan jeg finne')) return true
+  if (p.includes('hva sier') && (p.includes('manual') || p.includes('produsent'))) return true
+
+  return false
+}
+
+function extractResponseText(response: any): string {
+  if (typeof response?.output_text === 'string' && response.output_text.trim()) {
+    return response.output_text.trim()
+  }
+
+  const messageItem = response?.output?.find((item: any) => item?.type === 'message')
+  const contentItem = messageItem?.content?.find(
+    (c: any) => c?.type === 'output_text' || c?.type === 'text'
+  )
+  const text = contentItem?.text
+  return typeof text === 'string' ? text.trim() : ''
+}
+
+async function createWebSearchResponse(opts: {
+  model: string
+  messages: Array<{ role: string; content: string }>
+  temperature?: number
+  maxOutputTokens?: number
+  searchContextSize?: 'low' | 'medium' | 'high'
+}) {
+  const {
+    model,
+    messages,
+    temperature = 0.7,
+    maxOutputTokens = 1500,
+    searchContextSize = 'medium',
+  } = opts
+
+  // Use the Responses API + web search tool so the model can actually look up manuals/specs.
+  return openai.responses.create({
+    model,
+    input: messages,
+    tools: [
+      {
+        type: 'web_search_preview',
+        search_context_size: searchContextSize,
+      },
+    ],
+    temperature,
+    max_output_tokens: maxOutputTokens,
+  } as any)
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { action, field, value, manufacturer, model, type, maintenanceTitle, maintenanceCategory, maintenanceType, prompt: userPrompt, chatHistory } = body
+    const {
+      action,
+      field,
+      value,
+      manufacturer,
+      model,
+      type,
+      maintenanceTitle,
+      maintenanceCategory,
+      maintenanceType,
+      prompt: userPrompt,
+      chatHistory,
+      webSearch,
+      webSearchContextSize,
+    } = body
 
     // Handle general chat prompt with action detection
     if (userPrompt && !action) {
@@ -88,7 +246,7 @@ export async function POST(request: Request) {
       const messages: any[] = [
         {
           role: 'system',
-          content: `Du er en proaktiv AI-assistent for båteiere, ekspert på båter, båtmotorer, og båtvedlikehold. 
+          content: `Du er en proaktiv AI-assistent for båteiere, ekspert på båter, båtmotorer, og båtvedlikehold. Du skal være frempå og hjelpe mest mulig med konkrete neste steg.
 
 ${userContext}
 
@@ -96,6 +254,28 @@ VIKTIG - DU KAN UTFØRE FØLGENDE HANDLINGER AUTOMATISK:
 1. Legge til vedlikeholdslogg-oppføring
 2. Opprette påminnelser for fremtidig vedlikehold
 3. Foreslå manualer/dokumenter
+
+Du har også tilgang til web-søk. Når brukeren spør etter mål/dimensjoner, spesifikasjoner, dele-/sprengskisser, eller manualer (PDF), bruk web-søk og inkluder konkrete kilder/URL-er i svaret.
+
+VIKTIG - HVORDAN DU SVARER:
+- Gi ALLTID konkrete svar direkte i chatten - ikke si "se i manualen" eller "sjekk dokumentet".
+- Hvis du bruker web-søk for å finne informasjon, PRESENTER funnene direkte i svaret ditt.
+- Når du henviser til en manual/kilde, inkluder relevant utdrag/informasjon i svaret OG lenk til kilden.
+- Brukeren skal få svaret sitt UTEN å måtte åpne eksterne lenker (lenkene er supplement/verifisering).
+- Eksempel RIKTIG: "MD11D bruker 3,5 liter motorolje (SAE 15W-40). Oljeskift anbefales hver 100 timer. Kilde: Volvo Penta MD11D Manual (https://...)".
+- Eksempel FEIL: "Du finner denne informasjonen i manualen her: https://...".
+- VIKTIG: Kun del lenker fra pålitelige kilder (offisielle produsenters nettsider, anerkjente PDF-databaser). Systemet vil validere at lenkene er aktive.
+
+PROAKTIV DOKUMENTHÅNDTERING:
+- Når det er relevant for samtalen (f.eks. feilsøking, vedlikehold, spesifikasjoner, prosedyrer), foreslå å finne og laste ned riktig brukermanual/verkstedmanual/datablad.
+- VIKTIG: Hver gang du inkluderer en lenke til en FIL i svaret ditt, MÅ du også sende en "suggest_document"-action med samme URL.
+- Nedlastbare filtyper (lagres i dokumentarkiv): .pdf, .doc, .docx, .txt, .jpg, .jpeg, .png, .gif, .xls, .xlsx, .csv, .ppt, .pptx, .zip, .rar
+- IKKE nedlastbare filtyper (lagres kun som lenker): .html, .htm, nettsider
+- Hvis du anbefaler et konkret dokument, inkluder minst én URL og legg det inn som en action av typen "suggest_document".
+- Hvis du inkluderer en URL i teksten din, og den URL-en er et dokument/manual/fil, legg ALLTID inn en "suggest_document"-action med samme URL.
+- Ikke si at du har "lagt til" eller "lastet opp" dokumenter hvis du ikke sender en "suggest_document"-action.
+- suggest_document er et SUPPLEMENT til svaret ditt - ikke hovedsvaret.
+- Sjekk alltid om URL-en inneholder et filnavn med endelse - hvis ja, send suggest_document.
 
 DIN OPPGAVE:
 Analyser brukerens forespørsel og identifiser om det skal utføres en handling. BRUK brukerens faktiske båt- og motorinformasjon når du svarer og foreslår handlinger.
@@ -111,6 +291,11 @@ SVAR ALLTID MED JSON I FØLGENDE FORMAT:
     }
   ]
 }
+
+KRITISK VIKTIG OM suggest_document:
+- Hvis du inkluderer EN ENESTE URL til en fil (.pdf, .doc, .jpg, etc.) i "response", MÅ du ha minst én "suggest_document" i "actions".
+- Ingen unntak - hver fil-URL i teksten krever en tilsvarende suggest_document-action.
+- Eksempel: hvis du skriver "se denne PDF-en: https://example.com/manual.pdf" i response, MÅ actions inneholde suggest_document med samme URL.
 
 HANDLINGSTYPER OG DATA:
 
@@ -160,7 +345,27 @@ HANDLINGSTYPER OG DATA:
   "confirmationMessage": "📄 Foreslått dokument: [tittel]"
 }
 
+Når du foreslår flere dokumenter, legg én "suggest_document"-action per dokument (i samme svar).
+
 EKSEMPLER:
+
+Input: "Hvor finner jeg manual for Volvo Penta MD11D?"
+Output:
+{
+  "response": "MD11D brukermanual finner du hos Volvo Penta. Manualen dekker drift, vedlikehold og feilsøking. Kilde: https://example.com/volvo-md11d-manual.pdf",
+  "actions": [
+    {
+      "type": "suggest_document",
+      "data": {
+        "title": "Volvo Penta MD11D Brukermanual",
+        "url": "https://example.com/volvo-md11d-manual.pdf",
+        "type": "brukermanual",
+        "description": "Komplett manual for drift og vedlikehold av MD11D motor"
+      },
+      "confirmationMessage": "📄 Foreslått dokument: Volvo Penta MD11D Brukermanual"
+    }
+  ]
+}
 
 Input: "Jeg byttet motorolje i dag, brukte 5L Castrol Edge 10W-40"
 Output:
@@ -230,15 +435,34 @@ HANDLINGS-REGLER:
           content: userPrompt,
         })
       }
+      // VANLIG SAMTALE
+      const useWebSearch =
+        typeof webSearch === 'boolean' ? webSearch : shouldUseWebSearchForPrompt(userPrompt)
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages,
-        temperature: 0.7,
-        max_tokens: 1500,
-      })
-
-      const responseText = completion.choices[0]?.message?.content?.trim()
+      let responseText = ''
+      if (useWebSearch) {
+        const response = await createWebSearchResponse({
+          model: 'gpt-4.1-mini',
+          messages,
+          temperature: 0.7,
+          maxOutputTokens: 1500,
+          searchContextSize:
+            webSearchContextSize === 'low' ||
+            webSearchContextSize === 'medium' ||
+            webSearchContextSize === 'high'
+              ? webSearchContextSize
+              : 'medium',
+        })
+        responseText = extractResponseText(response)
+      } else {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4.1-mini',
+          messages,
+          temperature: 0.7,
+          max_tokens: 1500,
+        })
+        responseText = completion.choices[0]?.message?.content?.trim() || ''
+      }
       
       try {
         // Try to parse as JSON

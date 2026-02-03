@@ -19,6 +19,7 @@ Dette vil opprette:
 - **engines** tabell - for motordetaljer
 - **equipment** tabell - for utstyr og tilbehør
 - **documents** tabell - for dokumenter
+- **document_links** tabell - for AI-forslåtte dokumentlenker (manualer o.l.)
 - Row Level Security (RLS) policies - for datasikkerhet
 
 ### 3. Konfigurer Storage
@@ -134,6 +135,10 @@ pnpm dev
 - Dokumentmetadata
 - Filer lagres i Supabase Storage
 - Knyttet til boat_id og user_id
+
+### document_links
+- Eksterne dokumentlenker (f.eks. verkstedmanualer/brukermanualer som AI finner på nett)
+- Vises på Dokumenter-siden under "Lenker (AI-forslag)"
 
 ## Sikkerhet
 - Row Level Security (RLS) aktivert på alle tabeller

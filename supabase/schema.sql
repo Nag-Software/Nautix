@@ -76,11 +76,26 @@ CREATE TABLE documents (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- External Document Links (AI-forslåtte lenker / dokumenter som ikke er lastet opp)
+CREATE TABLE document_links (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  boat_id UUID REFERENCES boats(id) ON DELETE SET NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  url TEXT NOT NULL,
+  type VARCHAR(100) DEFAULT 'annet',
+  description TEXT,
+  source VARCHAR(50) DEFAULT 'ai',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Row Level Security (RLS) Policies
 ALTER TABLE boats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE engines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE equipment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_links ENABLE ROW LEVEL SECURITY;
 
 -- Boats policies
 CREATE POLICY "Users can view their own boats"
@@ -150,6 +165,23 @@ CREATE POLICY "Users can delete their own documents"
   ON documents FOR DELETE
   USING (auth.uid() = user_id);
 
+-- Document links policies
+CREATE POLICY "Users can view their own document links"
+  ON document_links FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own document links"
+  ON document_links FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own document links"
+  ON document_links FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own document links"
+  ON document_links FOR DELETE
+  USING (auth.uid() = user_id);
+
 -- Create indexes for better performance
 CREATE INDEX idx_boats_user_id ON boats(user_id);
 CREATE INDEX idx_engines_boat_id ON engines(boat_id);
@@ -158,6 +190,8 @@ CREATE INDEX idx_equipment_boat_id ON equipment(boat_id);
 CREATE INDEX idx_equipment_user_id ON equipment(user_id);
 CREATE INDEX idx_documents_boat_id ON documents(boat_id);
 CREATE INDEX idx_documents_user_id ON documents(user_id);
+CREATE INDEX idx_document_links_boat_id ON document_links(boat_id);
+CREATE INDEX idx_document_links_user_id ON document_links(user_id);
 
 -- Create storage bucket for documents
 INSERT INTO storage.buckets (id, name, public) 

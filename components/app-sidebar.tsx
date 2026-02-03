@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import {
   BookOpen,
   Command,
+  Folder,
   LifeBuoy,
   MessageSquare,
   Send,
@@ -55,11 +56,13 @@ const data = {
           title: "Utstyr & Tilbehør",
           url: "/min-bat/utstyr",
         },
-        {
-          title: "Dokumenter",
-          url: "/min-bat/dokumenter",
-        },
       ],
+    },
+    {
+      title: "Dokumenter",
+      url: "/min-bat/dokumenter",
+      icon: Folder,
+      isActive: true,
     },
     {
       title: "Vedlikehold",

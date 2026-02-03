@@ -8,6 +8,7 @@ import {
   LogOut,
   Sparkles,
 } from "lucide-react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
@@ -31,6 +32,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { AccountSettingsSheet } from "@/components/account-settings-sheet"
+import { BillingSheet } from "@/components/billing-sheet"
 
 export function NavUser({
   user,
@@ -44,6 +47,8 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const router = useRouter()
   const supabase = createClient()
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [billingOpen, setBillingOpen] = useState(false)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -90,24 +95,13 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAccountOpen(true)}>
                 <BadgeCheck />
-                Account
+                Konto
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setBillingOpen(true)}>
                 <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
+                Abonnement
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -118,6 +112,17 @@ export function NavUser({
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+
+      <AccountSettingsSheet
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        user={user}
+      />
+
+      <BillingSheet
+        open={billingOpen}
+        onOpenChange={setBillingOpen}
+      />
     </SidebarMenu>
   )
 }

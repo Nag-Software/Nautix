@@ -40,6 +40,7 @@ import {
   Plus, 
   Upload, 
   Download,
+  ExternalLink,
   Shield,
   FileCheck,
   AlertCircle,
@@ -51,6 +52,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Toaster } from "sonner"
+import { LinkifiedText } from "@/components/linkified-text"
 
 interface Document {
   id: string
@@ -67,8 +69,22 @@ interface Document {
   updated_at: string
 }
 
+interface DocumentLink {
+  id: string
+  boat_id: string | null
+  user_id: string
+  title: string
+  url: string
+  type: string
+  description?: string | null
+  source?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export default function DokumenterPage() {
   const [documents, setDocuments] = useState<Document[]>([])
+  const [documentLinks, setDocumentLinks] = useState<DocumentLink[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -91,16 +107,23 @@ export default function DokumenterPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data, error } = await supabase
-        .from("documents")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("upload_date", { ascending: false })
+      const [docsResult, linksResult] = await Promise.all([
+        supabase
+          .from("documents")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("upload_date", { ascending: false }),
+        supabase
+          .from("document_links")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      ])
 
-      if (error) throw error
+      if (docsResult.error) throw docsResult.error
 
       // Update status based on expiry date
-      const updatedDocs = (data || []).map(doc => {
+      const updatedDocs = (docsResult.data || []).map((doc: any) => {
         if (!doc.expiry_date) return { ...doc, status: "valid" }
         
         const expiryDate = new Date(doc.expiry_date)
@@ -113,6 +136,18 @@ export default function DokumenterPage() {
       })
 
       setDocuments(updatedDocs)
+
+      if (linksResult.error) {
+        const maybeMissingTable =
+          linksResult.error.code === "42P01" ||
+          String(linksResult.error.message || "").toLowerCase().includes("document_links")
+        if (!maybeMissingTable) {
+          console.error("Error fetching document links:", linksResult.error)
+        }
+        setDocumentLinks([])
+      } else {
+        setDocumentLinks((linksResult.data || []) as DocumentLink[])
+      }
     } catch (error) {
       console.error("Error fetching documents:", error)
       toast.error("Kunne ikke laste dokumenter")
@@ -313,6 +348,33 @@ export default function DokumenterPage() {
     })
   }
 
+  const handleDeleteLink = async (link: DocumentLink) => {
+    toast(`Fjern lenken "${link.title}"?`, {
+      action: {
+        label: "Fjern",
+        onClick: async () => {
+          try {
+            const { error } = await supabase
+              .from("document_links")
+              .delete()
+              .eq("id", link.id)
+
+            if (error) throw error
+            toast.success("Lenke fjernet")
+            fetchDocuments()
+          } catch (error) {
+            console.error("Error deleting document link:", error)
+            toast.error("Kunne ikke fjerne lenken")
+          }
+        },
+      },
+      cancel: {
+        label: "Avbryt",
+        onClick: () => {},
+      },
+    })
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "valid":
@@ -426,6 +488,51 @@ export default function DokumenterPage() {
                 </div>
               </div>
             </div>
+
+            {/* External Links */}
+            {!loading && documentLinks.length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-base sm:text-lg font-semibold">Lenker</h2>
+                <div className="space-y-2">
+                  {documentLinks.map((link) => (
+                    <div key={link.id} className="rounded-lg border p-2 sm:p-3">
+                      <div className="flex items-start gap-2">
+                        <div className="rounded-full bg-primary/10 p-1.5 shrink-0">
+                          <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-semibold text-sm leading-tight">{link.title}</h3>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteLink(link)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Trash2 className="h-3 w-3 sm:mr-1" />
+                              <span className="hidden sm:inline">Fjern</span>
+                            </Button>
+                          </div>
+                          {link.description ? (
+                            <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                              {link.description}
+                            </p>
+                          ) : null}
+                          <div className="text-xs text-muted-foreground">
+                            {link.type ? <span>{link.type}</span> : null}
+                            <span className="mx-2">•</span>
+                            <span>{new Date(link.created_at).toLocaleDateString("nb-NO")}</span>
+                          </div>
+                          <div className="pt-1">
+                            <LinkifiedText text={link.url} className="text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Document List */}
             {loading ? (

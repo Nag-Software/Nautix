@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Toaster } from "sonner"
+import { LinkifiedText } from "@/components/linkified-text"
 
 interface Message {
   id: string
@@ -96,11 +97,104 @@ export default function Page() {
         return true
       }
       else if (action.type === "suggest_document") {
-        // For now, just show a toast with the suggestion
-        toast.info(action.confirmationMessage, {
-          description: `${action.data.description}\n\nURL: ${action.data.url}`,
-          duration: 10000
-        })
+        const url = action.data?.url ? String(action.data.url) : ""
+        const title = action.data?.title ? String(action.data.title) : "Dokument"
+        const type = action.data?.type ? String(action.data.type) : "annet"
+        const description = action.data?.description ? String(action.data.description) : null
+
+        // Check if file is downloadable (not .html)
+        const downloadableExtensions = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.xls', '.xlsx', '.csv', '.ppt', '.pptx', '.zip', '.rar']
+        const isDownloadable = downloadableExtensions.some(ext => url.toLowerCase().includes(ext)) && 
+                               !url.toLowerCase().includes('.html') && 
+                               !url.toLowerCase().includes('.htm')
+
+        if (isDownloadable) {
+          // Ask user to download and save file to Supabase Storage
+          toast(action.confirmationMessage || `Last ned "${title}"?`, {
+            description: description ? `${description}\n\nFilen lastes ned og lagres i dokumentarkivet.` : "Filen lastes ned og lagres i dokumentarkivet.",
+            duration: 10000,
+            action: {
+              label: "Last ned",
+              onClick: async () => {
+                const downloadToast = toast.loading("Laster ned dokument...")
+                try {
+                  const downloadResponse = await fetch("/api/download-document", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url, title, type, description })
+                  })
+
+                  const downloadData = await downloadResponse.json()
+
+                  if (!downloadResponse.ok) {
+                    throw new Error(downloadData.error || "Kunne ikke laste ned dokument")
+                  }
+
+                  toast.success("Dokument lastet ned og lagret", { id: downloadToast })
+                } catch (error: any) {
+                  console.error("Download error:", error)
+                  toast.error(error.message || "Kunne ikke laste ned dokument", { id: downloadToast })
+                }
+              },
+            },
+            cancel: {
+              label: "Avvis",
+              onClick: () => {},
+            },
+          })
+        } else {
+          // Save as link only (for .html and non-downloadable files)
+          toast(action.confirmationMessage || `Legg til "${title}" som lenke?`, {
+            description: description || undefined,
+            duration: 10000,
+            action: {
+              label: "Legg til",
+              onClick: async () => {
+                try {
+                  const { data: boats } = await supabase
+                    .from("boats")
+                    .select("id")
+                    .eq("user_id", user.id)
+                    .limit(1)
+
+                  const boatId = boats?.[0]?.id ?? null
+
+                  const { error } = await supabase
+                    .from("document_links")
+                    .insert([
+                      {
+                        user_id: user.id,
+                        boat_id: boatId,
+                        title,
+                        url,
+                        type,
+                        description,
+                        source: "ai",
+                      },
+                    ])
+
+                  if (error) throw error
+
+                  toast.success("Lenke lagt til under Dokumenter")
+                } catch (error: any) {
+                  const maybeMissingTable =
+                    error?.code === "42P01" ||
+                    String(error?.message || "").toLowerCase().includes("document_links")
+
+                  if (maybeMissingTable) {
+                    toast.error("Database-tabell mangler. Kjør SQL-setup først.")
+                  } else {
+                    toast.error("Kunne ikke legge til lenke")
+                  }
+                }
+              },
+            },
+            cancel: {
+              label: "Avvis",
+              onClick: () => {},
+            },
+          })
+        }
         return true
       }
     } catch (error) {
@@ -170,9 +264,65 @@ export default function Page() {
 
       const data = await response.json()
       
-      // Execute actions if any
+      // Auto-detect file URLs in response and create suggest_document actions if missing
+      const fileExtensions = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.xls', '.xlsx', '.csv', '.ppt', '.pptx', '.zip', '.rar', '.xml', '.json']
+      const urlRegex = /https?:\/\/[^\s<>()]+/g
+      const responseText = data.suggestion || ""
+      const foundUrls = responseText.match(urlRegex) || []
+      
+      const existingDocUrls = new Set(
+        (data.actions || [])
+          .filter((a: any) => a.type === "suggest_document")
+          .map((a: any) => a.data?.url)
+      )
+      
+      // Add missing suggest_document actions for file URLs
+      for (const url of foundUrls) {
+        const isFileUrl = fileExtensions.some(ext => url.toLowerCase().includes(ext))
+        if (isFileUrl && !existingDocUrls.has(url)) {
+          const filename = url.split('/').pop()?.split('?')[0] || "Dokument"
+          const autoAction = {
+            type: "suggest_document",
+            data: {
+              title: filename,
+              url: url,
+              type: "annet",
+              description: "Automatisk detektert fra AI-svar"
+            },
+            confirmationMessage: `📄 Foreslått dokument: ${filename}`
+          }
+          data.actions = data.actions || []
+          data.actions.push(autoAction)
+        }
+      }
+      
+      // Execute actions if any, with URL validation for suggest_document
       if (data.actions && Array.isArray(data.actions)) {
         for (const action of data.actions) {
+          // Validate URLs in suggest_document actions before executing
+          if (action.type === "suggest_document" && action.data?.url) {
+            try {
+              const validateResponse = await fetch("/api/validate-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: action.data.url })
+              })
+              const validateData = await validateResponse.json()
+              
+              if (!validateData.valid) {
+                console.warn("Invalid/inactive URL in suggest_document, skipping:", action.data.url)
+                toast.warning(`Lenken til "${action.data.title}" er ikke tilgjengelig for øyeblikket`)
+                continue // Skip this action if URL is not active
+              }
+              
+              // Use cleaned URL from validation
+              if (validateData.url && validateData.url !== action.data.url) {
+                action.data.url = validateData.url
+              }
+            } catch (error) {
+              console.warn("URL validation failed, proceeding anyway:", error)
+            }
+          }
           await executeAction(action)
         }
       }
@@ -271,7 +421,7 @@ export default function Page() {
                             : "bg-muted"
                         )}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <LinkifiedText text={message.content} className="text-sm" />
                       </div>
                       {message.role === "user" && (
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">

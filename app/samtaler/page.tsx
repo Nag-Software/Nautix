@@ -43,6 +43,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { IconLivePhoto } from "@tabler/icons-react"
+import { LinkifiedText } from "@/components/linkified-text"
 
 interface Conversation {
   id: string
@@ -367,7 +368,7 @@ export default function SamtalerPage() {
                           {new Date(message.created_at).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                      <LinkifiedText text={message.content} className="text-sm" />
                     </div>
                   </div>
                 ))
