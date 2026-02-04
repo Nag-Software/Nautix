@@ -443,14 +443,14 @@ export default function RemindersPage() {
 
         <main className="flex flex-1 flex-col w-full mx-auto max-w-6xl gap-6 p-4 md:p-6 lg:p-8">
           <div className="w-full space-y-6">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col items-left justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Vedlikeholdspåminnelser</h1>
                 <p className="text-muted-foreground">
                   Hold oversikt over kommende vedlikehold og viktige oppgaver
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-4 w-full">
                 <Button 
                   variant={showArchived ? "default" : "outline"}
                   onClick={() => setShowArchived(!showArchived)} 

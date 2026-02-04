@@ -36,7 +36,17 @@ import {
   DollarSign,
   Clock,
   Filter,
+  FileText,
+  Wrench,
+  CheckCircle2,
 } from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 import { MaintenanceLog, MaintenanceLogDialog } from "./maintenance-log-dialog"
 import { AiReminderDialog } from "./ai-reminder-dialog"
@@ -53,6 +63,7 @@ export function MaintenanceLogTable() {
     open: boolean
     log?: MaintenanceLog
   }>({ open: false })
+  const [selectedLog, setSelectedLog] = useState<MaintenanceLog | null>(null)
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -273,14 +284,18 @@ export function MaintenanceLogTable() {
             {filteredLogs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  {logs.length === 0
-                    ? "Ingen oppføringer ennå. Legg til din første vedlikeholdsoppføring!"
+                      {logs.length === 0
+                        ? "Ingen oppføringer ennå. Legg til din første vedlikeholdsoppføring!"
                     : "Ingen oppføringer matcher filteret."}
                 </TableCell>
               </TableRow>
             ) : (
               filteredLogs.map((log) => (
-                <TableRow key={log.id}>
+                <TableRow 
+                  key={log.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => setSelectedLog(log)}
+                >
                   <TableCell className="font-medium">
                     {new Date(log.date).toLocaleDateString("nb-NO", {
                       day: "2-digit",
@@ -288,11 +303,11 @@ export function MaintenanceLogTable() {
                       year: "numeric",
                     })}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="max-w-xs">
                     <div className="space-y-1">
                       <div className="font-medium">{log.title}</div>
                       {log.description && (
-                        <div className="text-sm text-muted-foreground line-clamp-1">
+                        <div className="text-sm text-muted-foreground truncate line-clamp-1">
                           {log.description}
                         </div>
                       )}
@@ -316,7 +331,11 @@ export function MaintenanceLogTable() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -376,6 +395,140 @@ export function MaintenanceLogTable() {
           onOpenChange={(open) => setReminderDialog({ open, log: open ? reminderDialog.log : undefined })}
         />
       )}
+
+      {/* Detail Drawer */}
+      <Sheet open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          {selectedLog && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="text-2xl">{selectedLog.title}</SheetTitle>
+                <SheetDescription>
+                  {new Date(selectedLog.date).toLocaleDateString("nb-NO", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-6 space-y-6 px-4">
+                {/* Status and Type */}
+                <div className="flex flex-wrap gap-2">
+                  {getStatusBadge(selectedLog.status)}
+                  <Badge variant="outline">{getTypeBadge(selectedLog.type)}</Badge>
+                  <Badge variant="secondary" className={getCategoryBadgeColor(selectedLog.category)}>
+                    {selectedLog.category.charAt(0).toUpperCase() + selectedLog.category.slice(1)}
+                  </Badge>
+                </div>
+
+                {/* Description */}
+                {selectedLog.description && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      Beskrivelse
+                    </div>
+                    <p className="text-sm leading-relaxed">{selectedLog.description}</p>
+                  </div>
+                )}
+
+                {/* Cost and Hours */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                      <DollarSign className="h-4 w-4" />
+                      Kostnad
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {selectedLog.cost ? `${selectedLog.cost.toLocaleString('nb-NO')} kr` : "0 kr"}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      Timer brukt
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {selectedLog.hours_spent ? `${selectedLog.hours_spent} t` : "0 t"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Parts Used */}
+                {selectedLog.parts_used && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                      <Wrench className="h-4 w-4" />
+                      Deler brukt
+                    </div>
+                    <p className="text-sm leading-relaxed">{selectedLog.parts_used}</p>
+                  </div>
+                )}
+
+                {/* Performed By */}
+                {selectedLog.performed_by && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Utført av
+                    </div>
+                    <p className="text-sm font-medium">{selectedLog.performed_by}</p>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {selectedLog.notes && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      Notater
+                    </div>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedLog.notes}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex flex-col gap-2 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setEditingLog(selectedLog)
+                      setSelectedLog(null)
+                    }}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Rediger oppføring
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setReminderDialog({ open: true, log: selectedLog })
+                      setSelectedLog(null)
+                    }}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4 text-purple-500" />
+                    Opprett påminnelse med AI
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      handleDelete(selectedLog.id)
+                      setSelectedLog(null)
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Slett oppføring
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
