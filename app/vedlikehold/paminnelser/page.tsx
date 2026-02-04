@@ -25,6 +25,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -559,7 +566,7 @@ export default function RemindersPage() {
                 </div>
 
                 {/* Desktop Table */}
-                <div className="hidden md:block rounded-lg border bg-card">
+                <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent border-b">
@@ -581,7 +588,11 @@ export default function RemindersPage() {
                         const deletePending = isActionPending(reminder.id, "delete")
                     
                         return (
-                          <TableRow key={reminder.id} className="hover:bg-muted/50">
+                          <TableRow 
+                            key={reminder.id} 
+                            className="hover:bg-muted/50 cursor-pointer"
+                            onClick={() => setSelectedReminder(reminder)}
+                          >
                             <TableCell className="h-16 px-4">
                               <div className="flex items-center gap-3">
                                 <div className="rounded-full bg-primary/10 p-2">
@@ -647,7 +658,7 @@ export default function RemindersPage() {
                                 <span className="text-muted-foreground/50">-</span>
                               )}
                             </TableCell>
-                            <TableCell className="h-16 px-4">
+                            <TableCell className="h-16 px-4" onClick={(e) => e.stopPropagation()}>
                           <TooltipProvider>
                             <div className="flex items-center gap-1">
                               {!reminder.completed ? (
@@ -742,9 +753,9 @@ export default function RemindersPage() {
         </main>
       </SidebarInset>
 
-      {/* Reminder Details Dialog */}
-      <Dialog open={!!selectedReminder} onOpenChange={(open) => !open && setSelectedReminder(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      {/* Reminder Details Drawer */}
+      <Sheet open={!!selectedReminder} onOpenChange={(open) => !open && setSelectedReminder(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selectedReminder && (() => {
             const Icon = categoryIcons[selectedReminder.category] || Anchor
             const busy = isReminderBusy(selectedReminder.id)
@@ -754,16 +765,16 @@ export default function RemindersPage() {
             
             return (
               <>
-                <DialogHeader>
+                <SheetHeader>
                   <div className="flex items-start gap-3">
                     <div className="rounded-full bg-primary/10 p-3">
                       <Icon className="h-5 w-5 text-primary" />
                     </div>
                     <div className="flex-1">
-                      <DialogTitle className={`text-left ${selectedReminder.completed ? 'line-through text-muted-foreground' : ''}`}>
+                      <SheetTitle className={`text-left ${selectedReminder.completed ? 'line-through text-muted-foreground' : ''}`}>
                         {selectedReminder.title}
-                      </DialogTitle>
-                      <DialogDescription className="mt-1.5">
+                      </SheetTitle>
+                      <SheetDescription className="mt-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           {getStatusBadge(selectedReminder)}
                           {getPriorityBadge(selectedReminder.priority)}
@@ -774,12 +785,12 @@ export default function RemindersPage() {
                             </Badge>
                           )}
                         </div>
-                      </DialogDescription>
+                      </SheetDescription>
                     </div>
                   </div>
-                </DialogHeader>
+                </SheetHeader>
 
-                <div className="space-y-4 mt-4">
+                <div className="space-y-4 mt-4 px-4">
                   <div>
                     <h4 className="text-sm font-medium mb-2">Kategori</h4>
                     <p className="text-sm text-muted-foreground capitalize">{selectedReminder.category}</p>
@@ -871,8 +882,8 @@ export default function RemindersPage() {
               </>
             )
           })()}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* New Reminder Dialog */}
       <Dialog open={newReminderOpen} onOpenChange={setNewReminderOpen}>

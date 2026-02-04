@@ -38,6 +38,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Check admin access for /sjefen route
+  if (user && request.nextUrl.pathname.startsWith('/sjefen')) {
+    const { data: adminData, error } = await supabase
+      .from('admin_users')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    // If there's an error or no admin data, redirect to home
+    if (error || !adminData) {
+      console.log('Admin check failed:', { error, adminData, userId: user.id })
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+  }
+
   // If user is signed in and trying to access /login or /signup, redirect to home
   if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
     const url = request.nextUrl.clone()
