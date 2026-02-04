@@ -557,7 +557,6 @@ Svar ALLTID med et JSON-objekt med følgende felter (bruk null hvis du ikke vet 
   "length_meters": "lengde i FOT som desimaltall (f.eks: '21.3')",
   "width_meters": "bredde i meter som desimaltall (f.eks: '2.4')",
   "weight_kg": "vekt i kg som heltall (f.eks: '1200')",
-  "hull_material": "skrogmateriale (f.eks: 'Glassfiber', 'Aluminium', 'Tre', 'Stål')",
   "year": "typisk produksjonsår (valgfritt)"
 }
 
