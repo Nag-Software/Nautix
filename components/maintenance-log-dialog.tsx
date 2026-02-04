@@ -45,11 +45,17 @@ export interface MaintenanceLog {
 interface MaintenanceLogDialogProps {
   onSuccess?: () => void
   editData?: MaintenanceLog
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function MaintenanceLogDialog({ onSuccess, editData }: MaintenanceLogDialogProps) {
-  const [open, setOpen] = useState(false)
+export function MaintenanceLogDialog({ onSuccess, editData, open: controlledOpen, onOpenChange }: MaintenanceLogDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  
+  // Use controlled open if provided, otherwise use internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = onOpenChange || setInternalOpen
   const [formData, setFormData] = useState({
     title: editData?.title || "",
     description: editData?.description || "",
@@ -148,18 +154,14 @@ export function MaintenanceLogDialog({ onSuccess, editData }: MaintenanceLogDial
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {editData ? (
-          <Button variant="outline" size="sm">
-            Rediger
-          </Button>
-        ) : (
+      {!editData && (
+        <DialogTrigger asChild>
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Ny oppføring
           </Button>
-        )}
-      </DialogTrigger>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>

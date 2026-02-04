@@ -58,7 +58,10 @@ export function MaintenanceLogTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
-  const [editingLog, setEditingLog] = useState<MaintenanceLog | undefined>()
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean
+    log?: MaintenanceLog
+  }>({ open: false })
   const [reminderDialog, setReminderDialog] = useState<{
     open: boolean
     log?: MaintenanceLog
@@ -352,7 +355,12 @@ export function MaintenanceLogTable() {
                           Opprett påminnelse med AI
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setEditingLog(log)}>
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditDialog({ open: true, log })
+                          }}
+                        >
                           <Edit className="mr-2 h-4 w-4" />
                           Rediger
                         </DropdownMenuItem>
@@ -374,11 +382,17 @@ export function MaintenanceLogTable() {
       </div>
 
       {/* Edit Dialog */}
-      {editingLog && (
+      {editDialog.log && (
         <MaintenanceLogDialog
-          editData={editingLog}
+          editData={editDialog.log}
+          open={editDialog.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditDialog({ open: false })
+            }
+          }}
           onSuccess={() => {
-            setEditingLog(undefined)
+            setEditDialog({ open: false })
             fetchLogs()
           }}
         />
@@ -494,8 +508,7 @@ export function MaintenanceLogTable() {
                     variant="outline" 
                     className="w-full justify-start"
                     onClick={() => {
-                      setEditingLog(selectedLog)
-                      setSelectedLog(null)
+                      setEditDialog({ open: true, log: selectedLog })
                     }}
                   >
                     <Edit className="mr-2 h-4 w-4" />

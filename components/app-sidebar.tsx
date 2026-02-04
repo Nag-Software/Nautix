@@ -6,6 +6,7 @@ import {
   BookOpen,
   Command,
   Folder,
+  Heart,
   LifeBuoy,
   MessageSquare,
   Send,
@@ -122,6 +123,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: "Tilbakemelding",
       icon: Send,
       onClick: () => setFeedbackOpen(true),
+    },
+    {
+      title: "Gi en gave",
+      url: "/gave",
+      icon: Heart,
     },
   ]
 
