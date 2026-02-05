@@ -16,8 +16,38 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nautix - Din digitale båtassistent",
-  description: "",
+  title: {
+    default: "Nautix - Din digitale båtassistent",
+    template: "Nautix app",
+  },
+  description:
+    "Nautix hjelper deg med vedlikehold, dokumenter og oversikt – slik at du kan bruke mer tid på sjøen. Få påminnelser, AI-hjelp og full kontroll på båten din.",
+  keywords: [
+    "båt",
+    "vedlikehold",
+    "båtvedlikehold",
+    "båtlogg",
+    "dokumenter",
+    "AI-assistent",
+    "påminnelser",
+    "utstyr",
+    "maritim",
+    "båteier",
+  ],
+  authors: [{ name: "Nautix" }],
+  creator: "Nautix",
+  publisher: "Nautix",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+    ],
+    apple: [{ url: "/favicon.ico", sizes: "180x180" }],
+    shortcut: [{ url: "/favicon.ico" }],
+  }
 };
 
 export default function RootLayout({
