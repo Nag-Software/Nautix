@@ -70,7 +70,7 @@ export default function RootLayout({
           <ConversationProvider>
             {children}
           </ConversationProvider>
-          <Toaster richColors position="top-center" />
+          <Toaster richColors position="top-right" duration={15000} />
         </ThemeProvider>
         <Analytics />
       </body>

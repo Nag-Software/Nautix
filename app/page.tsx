@@ -21,7 +21,6 @@ import { IconSparkles, IconUser } from "@tabler/icons-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Toaster } from "sonner"
 import { LinkifiedText } from "@/components/linkified-text"
 
 interface Message {
@@ -53,22 +52,42 @@ export default function Page() {
 
     try {
       if (action.type === "add_maintenance") {
-        const { error } = await supabase
-          .from("maintenance_log")
-          .insert([{
-            ...action.data,
-            user_id: user.id,
-            status: action.data.status || "completed",
-            priority: action.data.priority || "medium",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
+        // Show confirmation toast before adding to maintenance log
+        toast(action.confirmationMessage || "Legg til i vedlikeholdsloggen?", {
+          description: `${action.data.title || 'Vedlikeholdsoppgave'} - ${action.data.category || 'Annet'}`,
+          duration: 15000,
+          action: {
+            label: "Legg til",
+            onClick: async () => {
+              try {
+                const { error } = await supabase
+                  .from("maintenance_log")
+                  .insert([{
+                    ...action.data,
+                    user_id: user.id,
+                    status: action.data.status || "completed",
+                    priority: action.data.priority || "medium",
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  }])
 
-        if (error) throw error
-        toast.success(action.confirmationMessage)
+                if (error) throw error
+                toast.success("✅ Lagt til i vedlikeholdsloggen")
+              } catch (error) {
+                console.error("Error adding maintenance:", error)
+                toast.error("Kunne ikke legge til i vedlikeholdsloggen")
+              }
+            },
+          },
+          cancel: {
+            label: "Avvis",
+            onClick: () => {},
+          },
+        })
         return true
       } 
       else if (action.type === "add_reminder") {
+        // Show confirmation toast before adding reminder
         const reminderData: any = {
           title: action.data.title,
           description: action.data.description || null,
@@ -88,12 +107,30 @@ export default function Page() {
           reminderData.recurrence_interval = action.data.recurrence_interval
         }
         
-        const { error } = await supabase
-          .from("reminders")
-          .insert([reminderData])
+        toast(action.confirmationMessage || "Opprett påminnelse?", {
+          description: `${action.data.title} - Forfaller: ${action.data.due_date}`,
+          duration: 15000,
+          action: {
+            label: "Opprett",
+            onClick: async () => {
+              try {
+                const { error } = await supabase
+                  .from("reminders")
+                  .insert([reminderData])
 
-        if (error) throw error
-        toast.success(action.confirmationMessage)
+                if (error) throw error
+                toast.success("✅ Påminnelse opprettet")
+              } catch (error) {
+                console.error("Error adding reminder:", error)
+                toast.error("Kunne ikke opprette påminnelse")
+              }
+            },
+          },
+          cancel: {
+            label: "Avvis",
+            onClick: () => {},
+          },
+        })
         return true
       }
       else if (action.type === "suggest_document") {
@@ -112,7 +149,7 @@ export default function Page() {
           // Ask user to download and save file to Supabase Storage
           toast(action.confirmationMessage || `Last ned "${title}"?`, {
             description: description ? `${description}\n\nFilen lastes ned og lagres i dokumentarkivet.` : "Filen lastes ned og lagres i dokumentarkivet.",
-            duration: 10000,
+            duration: 15000,
             action: {
               label: "Last ned",
               onClick: async () => {
@@ -146,7 +183,7 @@ export default function Page() {
           // Save as link only (for .html and non-downloadable files)
           toast(action.confirmationMessage || `Legg til "${title}" som lenke?`, {
             description: description || undefined,
-            duration: 10000,
+            duration: 15000,
             action: {
               label: "Legg til",
               onClick: async () => {
@@ -296,6 +333,9 @@ export default function Page() {
         }
       }
       
+      // Track URL validation results for summary
+      let urlValidationSummary: string[] = []
+      
       // Execute actions if any, with URL validation for suggest_document
       if (data.actions && Array.isArray(data.actions)) {
         for (const action of data.actions) {
@@ -310,15 +350,114 @@ export default function Page() {
               const validateData = await validateResponse.json()
               
               if (!validateData.valid) {
-                console.warn("Invalid/inactive URL in suggest_document, skipping:", action.data.url)
-                toast.warning(`Lenken til "${action.data.title}" er ikke tilgjengelig for øyeblikket`)
-                continue // Skip this action if URL is not active
+                console.warn("Invalid/inactive URL, requesting alternative from AI:", action.data.url)
+                
+                // Automatically request alternative URL from AI (up to 5 attempts)
+                const retryToast = toast.loading(`Lenken til "${action.data.title}" er ikke tilgjengelig. Søker etter alternativ kilde...`)
+                
+                let foundValidUrl = false
+                let testedUrls = new Set([action.data.url])
+                let urlCheckDetails: string[] = [`❌ ${action.data.url} (utilgjengelig)`]
+                
+                for (let attempt = 1; attempt <= 5 && !foundValidUrl; attempt++) {
+                  try {
+                    const retryPrompt = attempt === 1 
+                      ? `Den opprinnelige lenken ${action.data.url} til "${action.data.title}" er NEDE og svarer ikke (HTTP feil). 
+
+SØK PÅ WEB og finn EN HELT ANNEN alternativ kilde/lenke til dette dokumentet. Bruk en FORSKJELLIG server, domene eller nettsted enn ${new URL(action.data.url).hostname}. 
+
+KRITISK VIKTIG: Du MÅ returnere en "suggest_document" action med den nye URL-en i "actions"-arrayet. Uten denne action-en kan jeg ikke gi brukeren den alternative lenken.
+
+Søk etter: "${action.data.title}" PDF manual download`
+                      : `Følgende lenker til "${action.data.title}" er ALLE nede og fungerer IKKE:
+${Array.from(testedUrls).map(u => `- ${u}`).join('\n')}
+
+SØK PÅ WEB og finn EN HELT NY alternativ kilde fra et ANNET nettsted/domene. IKKE bruk disse domenene: ${Array.from(new Set(Array.from(testedUrls).map(u => {
+  try { return new URL(u).hostname } catch { return u }
+}))).join(', ')}
+
+KRITISK VIKTIG: Du MÅ returnere en "suggest_document" action med den nye URL-en. Dette er forsøk ${attempt}/5 så vær kreativ og søk bredt.
+
+Søk etter: "${action.data.title}" alternative download sites PDF`
+                    
+                    toast.loading(`Søker etter alternativ kilde ${attempt}/5...`, { id: retryToast })
+                    
+                    const retryResponse = await fetch("/api/suggest", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ 
+                        prompt: retryPrompt,
+                        chatHistory: [],
+                        webSearch: true, // CRITICAL: Enable web search to find real alternatives
+                        webSearchContextSize: 'high'
+                      })
+                    })
+                    
+                    const retryData = await retryResponse.json()
+                    
+                    console.log(`AI response for attempt ${attempt}:`, {
+                      suggestion: retryData.suggestion,
+                      actions: retryData.actions,
+                      hasDocActions: retryData.actions?.filter((a: any) => a.type === 'suggest_document').length
+                    })
+                    
+                    // Check if AI provided alternative document actions
+                    const alternativeAction = retryData.actions?.find(
+                      (a: any) => a.type === "suggest_document" && a.data?.url && !testedUrls.has(a.data.url)
+                    )
+                    
+                    if (alternativeAction && alternativeAction.data?.url) {
+                      console.log(`Found alternative URL (attempt ${attempt}):`, alternativeAction.data.url)
+                      testedUrls.add(alternativeAction.data.url)
+                      
+                      // Validate the new URL
+                      const newValidateResponse = await fetch("/api/validate-url", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url: alternativeAction.data.url })
+                      })
+                      const newValidateData = await newValidateResponse.json()
+                      
+                      if (newValidateData.valid) {
+                        // Use the new valid URL
+                        action.data.url = newValidateData.url || alternativeAction.data.url
+                        action.data.description = `Alternativ kilde (original ikke tilgjengelig): ${alternativeAction.data.description || ''}`
+                        urlCheckDetails.push(`✅ ${action.data.url} (aktiv - brukes)`)
+                        toast.success(`✅ Fant aktiv kilde til "${action.data.title}" (forsøk ${attempt}/5)`, { id: retryToast })
+                        foundValidUrl = true
+                        await executeAction(action)
+                      } else {
+                        urlCheckDetails.push(`❌ ${alternativeAction.data.url} (utilgjengelig)`)
+                        console.log(`Attempt ${attempt}/5 failed, URL not active:`, alternativeAction.data.url)
+                      }
+                    } else {
+                      console.log(`Attempt ${attempt}/5: AI did not provide a new alternative URL`)
+                      break // No point continuing if AI can't suggest more
+                    }
+                  } catch (retryError) {
+                    console.error(`Error on attempt ${attempt}/5:`, retryError)
+                  }
+                }
+                
+                if (!foundValidUrl) {
+                  toast.error(`Kunne ikke finne tilgjengelig kilde til "${action.data.title}" etter 5 forsøk`, { id: retryToast })
+                }
+                
+                // Add summary to validation report
+                if (urlCheckDetails.length > 0) {
+                  urlValidationSummary.push(`\n**Søk etter "${action.data.title}":**\n${urlCheckDetails.join('\n')}`)
+                }
+                
+                continue // Skip original action
               }
               
               // Use cleaned URL from validation
               if (validateData.url && validateData.url !== action.data.url) {
                 action.data.url = validateData.url
               }
+              
+              // Track successful validation
+              urlValidationSummary.push(`\n**Validert "${action.data.title}":**\n✅ ${action.data.url} (aktiv)`)
             } catch (error) {
               console.warn("URL validation failed, proceeding anyway:", error)
             }
@@ -327,10 +466,16 @@ export default function Page() {
         }
       }
       
+      // Add URL validation summary to response if any checks were performed
+      let finalContent = data.suggestion || "Beklager, jeg kunne ikke behandle forespørselen din."
+      if (urlValidationSummary.length > 0) {
+        finalContent += `\n\n---\n**URL-validering:**${urlValidationSummary.join('\n')}`
+      }
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.suggestion || "Beklager, jeg kunne ikke behandle forespørselen din.",
+        content: finalContent,
         timestamp: new Date()
       }
       
@@ -463,7 +608,6 @@ export default function Page() {
           )}
         </main>
       </SidebarInset>
-      <Toaster richColors position="top-right" />
     </SidebarProvider>
   )
 }

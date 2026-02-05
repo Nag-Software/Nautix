@@ -15,38 +15,39 @@ function cleanUrl(url: string): string {
 async function validateUrl(url: string): Promise<boolean> {
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8s timeout
 
     const response = await fetch(url, {
       method: 'HEAD',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Nautix-Bot/1.0',
+        'User-Agent': 'Mozilla/5.0 (compatible; Nautix-Bot/1.0)',
       },
     })
 
     clearTimeout(timeoutId)
-    return response.ok
+    if (response.ok) return true
   } catch (error) {
     // If HEAD fails, try GET with timeout
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      const timeoutId = setTimeout(() => controller.abort(), 8000) // 8s timeout
 
       const response = await fetch(url, {
         method: 'GET',
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Nautix-Bot/1.0',
+          'User-Agent': 'Mozilla/5.0 (compatible; Nautix-Bot/1.0)',
         },
       })
 
       clearTimeout(timeoutId)
-      return response.ok
+      if (response.ok) return true
     } catch {
-      return false
+      // Both methods failed
     }
   }
+  return false
 }
 
 export async function POST(request: Request) {
