@@ -6,7 +6,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { MaintenanceLogTable } from "@/components/maintenance-log-table";
 import { MaintenanceLogDialog } from "@/components/maintenance-log-dialog";
-import { Toaster } from "sonner";
 
 export default function Page() {
     return (
@@ -51,7 +50,6 @@ export default function Page() {
                     </div>
                 </main>
             </SidebarInset>
-            <Toaster richColors position="top-right" />
         </SidebarProvider>
     );
 }

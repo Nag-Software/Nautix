@@ -51,7 +51,6 @@ import {
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Toaster } from "sonner"
 import { LinkifiedText } from "@/components/linkified-text"
 
 interface Document {
@@ -808,7 +807,6 @@ export default function DokumenterPage() {
           </DialogContent>
         </Dialog>
       </SidebarInset>
-      <Toaster richColors position="top-center" />
     </SidebarProvider>
   )
 }

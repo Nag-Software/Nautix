@@ -266,13 +266,30 @@ VIKTIG - HVORDAN DU SVARER:
 - Eksempel FEIL: "Du finner denne informasjonen i manualen her: https://...".
 - VIKTIG: Kun del lenker fra pålitelige kilder (offisielle produsenters nettsider, anerkjente PDF-databaser). Systemet vil validere at lenkene er aktive.
 
+FORMATERING AV SVAR:
+- IKKE bruk markdown-formatering som ** (bold) eller __ (underline) i svaret ditt.
+- IKKE bruk formatet ([tekst](url)) - skriv bare vanlig tekst og URL-en direkte.
+- Lenker skal formateres slik: "Kilde: Beskrivelse https://url-her.com" eller bare "https://url-her.com"
+- Eksempel RIKTIG: "Du finner mer informasjon på Yamaha sitt nettsted: https://yamaha.com/manual"
+- Eksempel FEIL: "Du finner mer informasjon **her** ([Yamaha](https://yamaha.com/manual))"
+- Bruk linjeskift og kulepunkter (-, •) for å strukturere informasjon, men IKKE markdown.
+
+HVIS DU IKKE FINNER DET BRUKEREN BER OM:
+- ALDRI bare si "Jeg fant det ikke" eller "Jeg har dessverre ikke funnet...".
+- ALLTID foreslå et nyttig alternativ eller beslektet informasjon som kan hjelpe.
+- Eksempel: Hvis bruker ber om en manual du ikke finner, foreslå å søke etter spesifikasjoner, teknisk data, eller lignende båtmodeller som kan ha relevant info.
+- Eksempel: Hvis bruker ber om tegninger du ikke finner, foreslå å sjekke spesifikasjoner, dimensjoner, eller kontaktinfo til produsent.
+- Vær proaktiv - hjelp brukeren videre med alternative løsninger.
+
 PROAKTIV DOKUMENTHÅNDTERING:
 - Når det er relevant for samtalen (f.eks. feilsøking, vedlikehold, spesifikasjoner, prosedyrer), foreslå å finne og laste ned riktig brukermanual/verkstedmanual/datablad.
-- VIKTIG: Hver gang du inkluderer en lenke til en FIL i svaret ditt, MÅ du også sende en "suggest_document"-action med samme URL.
+- KRITISK REGEL: Når du foreslår et dokument, MÅ du inkludere URL-en BÅDE i "response"-teksten OG i "suggest_document"-action.
+- Eksempel: "Du kan laste ned manualen her: https://example.com/manual.pdf" I TILLEGG til suggest_document-action.
+- ALDRI si "Du kan laste ned manualen her:" uten å inkludere den faktiske URL-en i teksten.
 - Nedlastbare filtyper (lagres i dokumentarkiv): .pdf, .doc, .docx, .txt, .jpg, .jpeg, .png, .gif, .xls, .xlsx, .csv, .ppt, .pptx, .zip, .rar
 - IKKE nedlastbare filtyper (lagres kun som lenker): .html, .htm, nettsider
-- Hvis du anbefaler et konkret dokument, inkluder minst én URL og legg det inn som en action av typen "suggest_document".
-- Hvis du inkluderer en URL i teksten din, og den URL-en er et dokument/manual/fil, legg ALLTID inn en "suggest_document"-action med samme URL.
+- Hvis du anbefaler et konkret dokument, inkluder URL-en i teksten OG legg det inn som en action av typen "suggest_document".
+- Begge må ha SAMME URL - én i "response" (synlig for bruker) og én i "suggest_document"-action (for nedlasting).
 - Ikke si at du har "lagt til" eller "lastet opp" dokumenter hvis du ikke sender en "suggest_document"-action.
 - suggest_document er et SUPPLEMENT til svaret ditt - ikke hovedsvaret.
 - Sjekk alltid om URL-en inneholder et filnavn med endelse - hvis ja, send suggest_document.
@@ -352,7 +369,7 @@ EKSEMPLER:
 Input: "Hvor finner jeg manual for Volvo Penta MD11D?"
 Output:
 {
-  "response": "MD11D brukermanual finner du hos Volvo Penta. Manualen dekker drift, vedlikehold og feilsøking. Kilde: https://example.com/volvo-md11d-manual.pdf",
+  "response": "MD11D brukermanual finner du hos Volvo Penta. Manualen dekker drift, vedlikehold og feilsøking. Du kan laste den ned her: https://example.com/volvo-md11d-manual.pdf\n\nManualen er på engelsk og inneholder komplett informasjon om drift, vedlikehold og feilsøking.",
   "actions": [
     {
       "type": "suggest_document",
@@ -365,6 +382,31 @@ Output:
       "confirmationMessage": "📄 Foreslått dokument: Volvo Penta MD11D Brukermanual"
     }
   ]
+}
+
+Input: "Trenger service manual for Mercury 75 hk"
+Output:
+{
+  "response": "Jeg har funnet en servicehåndbok for Mercury 75 hk motorer. Denne manualen dekker full service, demontering og vedlikehold.\n\nLast ned manualen her: https://www.manualslib.com/manual/mercury-75-service.pdf\n\nManualen er på engelsk og inneholder detaljerte diagrammer og prosedyrer.",
+  "actions": [
+    {
+      "type": "suggest_document",
+      "data": {
+        "title": "Mercury 75 Service Manual",
+        "url": "https://www.manualslib.com/manual/mercury-75-service.pdf",
+        "type": "serviceguide",
+        "description": "Komplett servicemanual for Mercury 75 hk motor"
+      },
+      "confirmationMessage": "📄 Foreslått dokument: Mercury 75 Service Manual"
+    }
+  ]
+}
+
+Input: "Kan du finne brukermanual til Scanmar 33?"
+Output (hvis ikke funnet):
+{
+  "response": "Jeg fant dessverre ikke en digital brukermanual for Scanmar 33 som kan lastes ned direkte. Men jeg kan hjelpe deg med noe annet:\n\n- Scanmar sin kontaktinfo: Du kan kontakte dem på sales@scanmar.no eller telefon +47 33 35 44 00 for å be om en kopi av manualen.\n\n- I mellomtiden kan jeg hjelpe deg med:\n  • Tekniske spesifikasjoner for båten\n  • Vanlige vedlikeholdsoppgaver for seilbåter\n  • Spesifikke spørsmål om rigg, seil eller utstyr\n\nHva kan jeg hjelpe deg med angående Scanmar 33?",
+  "actions": []
 }
 
 Input: "Jeg byttet motorolje i dag, brukte 5L Castrol Edge 10W-40"
@@ -408,6 +450,13 @@ Output:
   "actions": []
 }
 
+Input: "Kan du finne tegninger til Scanmar 33?"
+Output (hvis du finner ressurser):
+{
+  "response": "Jeg har funnet noen nyttige ressurser om Scanmar 33:\n\n- Skippo har en side med spesifikasjoner og fakta om Scanmar 33:\nhttps://www.skippo.se/batar/batmarken/scanmar/33\n\n- Sailguide har detaljerte spesifikasjoner:\nhttps://www.sailguide.com/index.php/batfakta/scanmar-33\n\n- Boding Segel tilbyr seil til Scanmar 33:\nhttps://www.boding.se/modeller/scanmar-33/\n\nFor mer detaljerte tegninger anbefaler jeg å kontakte Scanmar direkte på sales@scanmar.no eller telefon +47 33 35 44 00.",
+  "actions": []
+}
+
 VIKTIGE REGLER:
 - Kun returner JSON, ingen annen tekst
 - BRUK brukerens faktiske båt/motor-informasjon i svarene dine (f.eks. hvis de har Suzuki DF150, nevn det)
@@ -435,34 +484,21 @@ HANDLINGS-REGLER:
           content: userPrompt,
         })
       }
-      // VANLIG SAMTALE
-      const useWebSearch =
-        typeof webSearch === 'boolean' ? webSearch : shouldUseWebSearchForPrompt(userPrompt)
-
+      // VANLIG SAMTALE - Always use web search for better results
       let responseText = ''
-      if (useWebSearch) {
-        const response = await createWebSearchResponse({
-          model: 'gpt-4.1-mini',
-          messages,
-          temperature: 0.7,
-          maxOutputTokens: 1500,
-          searchContextSize:
-            webSearchContextSize === 'low' ||
-            webSearchContextSize === 'medium' ||
-            webSearchContextSize === 'high'
-              ? webSearchContextSize
-              : 'medium',
-        })
-        responseText = extractResponseText(response)
-      } else {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4.1-mini',
-          messages,
-          temperature: 0.7,
-          max_tokens: 1500,
-        })
-        responseText = completion.choices[0]?.message?.content?.trim() || ''
-      }
+      const response = await createWebSearchResponse({
+        model: 'gpt-4.1-mini',
+        messages,
+        temperature: 0.7,
+        maxOutputTokens: 1500,
+        searchContextSize:
+          webSearchContextSize === 'low' ||
+          webSearchContextSize === 'medium' ||
+          webSearchContextSize === 'high'
+            ? webSearchContextSize
+            : 'medium',
+      })
+      responseText = extractResponseText(response)
       
       try {
         // Try to parse as JSON
@@ -482,8 +518,8 @@ HANDLINGS-REGLER:
 
     // Handle maintenance reminder suggestion
     if (action === 'maintenance_reminder') {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await createWebSearchResponse({
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -521,10 +557,11 @@ Når bør neste vedlikehold/service utføres?`,
           },
         ],
         temperature: 0.4,
-        max_tokens: 300,
+        maxOutputTokens: 300,
+        searchContextSize: 'medium',
       })
 
-      const responseText = completion.choices[0]?.message?.content?.trim()
+      const responseText = extractResponseText(response)
 
       if (responseText) {
         try {
@@ -546,8 +583,8 @@ Når bør neste vedlikehold/service utføres?`,
 
       // Handle boat autofill
       if (type === 'boat') {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+        const response = await createWebSearchResponse({
+          model: 'gpt-4.1-mini',
           messages: [
             {
               role: 'system',
@@ -568,10 +605,11 @@ Kun returner JSON-objektet, ingen annen tekst.`,
             },
           ],
           temperature: 0.3,
-          max_tokens: 300,
+          maxOutputTokens: 300,
+          searchContextSize: 'medium',
         })
 
-        const responseText = completion.choices[0]?.message?.content?.trim()
+        const responseText = extractResponseText(response)
 
         if (responseText) {
           try {
@@ -592,8 +630,8 @@ Kun returner JSON-objektet, ingen annen tekst.`,
       }
 
       // Handle engine autofill
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const response = await createWebSearchResponse({
+        model: 'gpt-4.1-mini',
         messages: [
           {
             role: 'system',
@@ -618,10 +656,11 @@ Kun returner JSON-objektet, ingen annen tekst.`,
           },
         ],
         temperature: 0.3,
-        max_tokens: 300,
+        maxOutputTokens: 300,
+        searchContextSize: 'medium',
       })
 
-      const responseText = completion.choices[0]?.message?.content?.trim()
+      const responseText = extractResponseText(response)
 
       if (responseText) {
         try {
@@ -660,8 +699,8 @@ Kun returner JSON-objektet, ingen annen tekst.`,
       return NextResponse.json({ suggestion: null })
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await createWebSearchResponse({
+      model: 'gpt-4.1-mini',
       messages: [
         {
           role: 'system',
@@ -673,10 +712,11 @@ Kun returner JSON-objektet, ingen annen tekst.`,
         },
       ],
       temperature: 0.3,
-      max_tokens: 50,
+      maxOutputTokens: 50,
+      searchContextSize: 'low',
     })
 
-    const suggestion = completion.choices[0]?.message?.content?.trim()
+    const suggestion = extractResponseText(response)
 
     if (suggestion && suggestion !== 'OK' && suggestion.toLowerCase() !== value.toLowerCase()) {
       return NextResponse.json({ suggestion })

@@ -16,7 +16,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { IconSparkles, IconUser } from "@tabler/icons-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -40,6 +40,12 @@ export default function Page() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, isLoading])
 
   const executeAction = async (action: AIAction) => {
     const supabase = createClient()
@@ -333,9 +339,6 @@ export default function Page() {
         }
       }
       
-      // Track URL validation results for summary
-      let urlValidationSummary: string[] = []
-      
       // Execute actions if any, with URL validation for suggest_document
       if (data.actions && Array.isArray(data.actions)) {
         for (const action of data.actions) {
@@ -352,14 +355,13 @@ export default function Page() {
               if (!validateData.valid) {
                 console.warn("Invalid/inactive URL, requesting alternative from AI:", action.data.url)
                 
-                // Automatically request alternative URL from AI (up to 5 attempts)
-                const retryToast = toast.loading(`Lenken til "${action.data.title}" er ikke tilgjengelig. Søker etter alternativ kilde...`)
+                // Automatically request alternative URL from AI (up to 10 attempts)
+                let retryToast = toast.loading(`Lenken til "${action.data.title}" er ikke tilgjengelig. Søker etter alternativ kilde...`)
                 
                 let foundValidUrl = false
                 let testedUrls = new Set([action.data.url])
-                let urlCheckDetails: string[] = [`❌ ${action.data.url} (utilgjengelig)`]
                 
-                for (let attempt = 1; attempt <= 5 && !foundValidUrl; attempt++) {
+                for (let attempt = 1; attempt <= 10 && !foundValidUrl; attempt++) {
                   try {
                     const retryPrompt = attempt === 1 
                       ? `Den opprinnelige lenken ${action.data.url} til "${action.data.title}" er NEDE og svarer ikke (HTTP feil). 
@@ -376,11 +378,12 @@ SØK PÅ WEB og finn EN HELT NY alternativ kilde fra et ANNET nettsted/domene. I
   try { return new URL(u).hostname } catch { return u }
 }))).join(', ')}
 
-KRITISK VIKTIG: Du MÅ returnere en "suggest_document" action med den nye URL-en. Dette er forsøk ${attempt}/5 så vær kreativ og søk bredt.
+KRITISK VIKTIG: Du MÅ returnere en "suggest_document" action med den nye URL-en. Dette er forsøk ${attempt}/10 så vær kreativ og søk bredt.
 
 Søk etter: "${action.data.title}" alternative download sites PDF`
                     
-                    toast.loading(`Søker etter alternativ kilde ${attempt}/5...`, { id: retryToast })
+                    // Update toast with current attempt number
+                    retryToast = toast.loading(`Søker etter alternativ kilde ${attempt}/10...`, { id: retryToast })
                     
                     const retryResponse = await fetch("/api/suggest", {
                       method: "POST",
@@ -422,30 +425,23 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
                         // Use the new valid URL
                         action.data.url = newValidateData.url || alternativeAction.data.url
                         action.data.description = `Alternativ kilde (original ikke tilgjengelig): ${alternativeAction.data.description || ''}`
-                        urlCheckDetails.push(`✅ ${action.data.url} (aktiv - brukes)`)
-                        toast.success(`✅ Fant aktiv kilde til "${action.data.title}" (forsøk ${attempt}/5)`, { id: retryToast })
+                        toast.success(`✅ Fant aktiv kilde til "${action.data.title}" (forsøk ${attempt}/10)`, { id: retryToast })
                         foundValidUrl = true
                         await executeAction(action)
                       } else {
-                        urlCheckDetails.push(`❌ ${alternativeAction.data.url} (utilgjengelig)`)
-                        console.log(`Attempt ${attempt}/5 failed, URL not active:`, alternativeAction.data.url)
+                        console.log(`Attempt ${attempt}/10 failed, URL not active:`, alternativeAction.data.url)
                       }
                     } else {
-                      console.log(`Attempt ${attempt}/5: AI did not provide a new alternative URL`)
+                      console.log(`Attempt ${attempt}/10: AI did not provide a new alternative URL`)
                       break // No point continuing if AI can't suggest more
                     }
                   } catch (retryError) {
-                    console.error(`Error on attempt ${attempt}/5:`, retryError)
+                    console.error(`Error on attempt ${attempt}/10:`, retryError)
                   }
                 }
                 
                 if (!foundValidUrl) {
-                  toast.error(`Kunne ikke finne tilgjengelig kilde til "${action.data.title}" etter 5 forsøk`, { id: retryToast })
-                }
-                
-                // Add summary to validation report
-                if (urlCheckDetails.length > 0) {
-                  urlValidationSummary.push(`\n**Søk etter "${action.data.title}":**\n${urlCheckDetails.join('\n')}`)
+                  toast.error(`Kunne ikke finne tilgjengelig kilde til "${action.data.title}" etter 10 forsøk`, { id: retryToast })
                 }
                 
                 continue // Skip original action
@@ -455,9 +451,6 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
               if (validateData.url && validateData.url !== action.data.url) {
                 action.data.url = validateData.url
               }
-              
-              // Track successful validation
-              urlValidationSummary.push(`\n**Validert "${action.data.title}":**\n✅ ${action.data.url} (aktiv)`)
             } catch (error) {
               console.warn("URL validation failed, proceeding anyway:", error)
             }
@@ -466,16 +459,10 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
         }
       }
       
-      // Add URL validation summary to response if any checks were performed
-      let finalContent = data.suggestion || "Beklager, jeg kunne ikke behandle forespørselen din."
-      if (urlValidationSummary.length > 0) {
-        finalContent += `\n\n---\n**URL-validering:**${urlValidationSummary.join('\n')}`
-      }
-      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: finalContent,
+        content: data.suggestion || "Beklager, jeg kunne ikke behandle forespørselen din.",
         timestamp: new Date()
       }
       
@@ -589,6 +576,7 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
               <div className="border-t bg-background p-4">

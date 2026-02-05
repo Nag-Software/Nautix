@@ -1,7 +1,6 @@
 "use client"
 
 import { LoginForm } from "@/components/login-form"
-import { Toaster } from "sonner"
 
 export default function LoginPage() {
   return (
@@ -9,7 +8,6 @@ export default function LoginPage() {
       <div className="w-full max-w-sm md:max-w-4xl">
         <LoginForm />
       </div>
-      <Toaster richColors position="top-right" />
     </div>
   )
 }

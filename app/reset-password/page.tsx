@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { Toaster, toast } from "sonner"
+import { toast } from "sonner"
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
@@ -79,7 +79,6 @@ export default function ResetPasswordPage() {
           </CardContent>
         </Card>
       </div>
-      <Toaster richColors position="top-right" />
     </div>
   )
 }

@@ -76,7 +76,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { Toaster, toast } from "sonner"
+import { toast } from "sonner"
 
 interface Reminder {
   id: string
@@ -985,7 +985,6 @@ export default function RemindersPage() {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
     </SidebarProvider>
   )
 }
