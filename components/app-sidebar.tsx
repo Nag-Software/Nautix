@@ -31,6 +31,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { title } from "process"
 
 const data = {
   navMain: [
@@ -60,12 +61,6 @@ const data = {
       ],
     },
     {
-      title: "Dokumenter",
-      url: "/min-bat/dokumenter",
-      icon: Folder,
-      isActive: true,
-    },
-    {
       title: "Vedlikehold",
       url: "#",
       icon: Wrench,
@@ -79,6 +74,18 @@ const data = {
           url: "/vedlikehold/paminnelser",
         },
       ],
+    },
+    {
+      title: "Dokumenter",
+      url: "/min-bat/dokumenter",
+      icon: Folder,
+      isActive: true,
+    },
+    {
+      title: "Forum",
+      url: "/forum",
+      icon: MessageSquare,
+      isActive: true,
     },
     {
       title: "Hjelp",
