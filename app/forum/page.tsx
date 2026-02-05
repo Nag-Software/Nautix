@@ -65,6 +65,7 @@ export default function ForumPage() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [editPostId, setEditPostId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   useEffect(() => {
     fetchCategories()
@@ -72,6 +73,7 @@ export default function ForumPage() {
   }, [selectedCategory])
 
   const fetchCategories = async () => {
+    setCategoriesLoading(true)
     try {
       const response = await fetch("/api/forum/categories")
       const data = await response.json()
@@ -86,6 +88,8 @@ export default function ForumPage() {
     } catch (error) {
       console.error("Error fetching categories:", error)
       setCategories([])
+    } finally {
+      setCategoriesLoading(false)
     }
   }
 
@@ -179,7 +183,15 @@ export default function ForumPage() {
 
           {/* Categories */}
           <div className="space-y-2">
-            {categories.length === 0 ? (
+            {categoriesLoading ? (
+              <Card>
+                <CardContent className="py-8 sm:py-12 px-4 text-center">
+                  <p className="text-sm sm:text-base text-muted-foreground">
+                    Laster inn...
+                  </p>
+                </CardContent>
+              </Card>
+            ) : categories.length === 0 ? (
               <Card>
                 <CardContent className="py-8 sm:py-12 px-4 text-center space-y-3 sm:space-y-4">
                   <p className="text-sm sm:text-base text-muted-foreground">
