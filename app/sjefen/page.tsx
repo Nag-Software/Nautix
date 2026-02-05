@@ -70,18 +70,6 @@ async function getAdminStats() {
   }
 }
 
-async function getUserGrowthData() {
-  // Mock data - in production, implement proper date-based queries
-  return [
-    { month: 'Jan', users: 12 },
-    { month: 'Feb', users: 19 },
-    { month: 'Mar', users: 27 },
-    { month: 'Apr', users: 35 },
-    { month: 'Mai', users: 42 },
-    { month: 'Jun', users: 51 },
-  ]
-}
-
 async function getCategoryBreakdown() {
   const supabase = await createClient()
 
@@ -133,9 +121,8 @@ export default async function SjefenPage() {
   }
 
   // Fetch all data
-  const [stats, userGrowth, categoryBreakdown, users, tickets] = await Promise.all([
+  const [stats, categoryBreakdown, users, tickets] = await Promise.all([
     getAdminStats(),
-    getUserGrowthData(),
     getCategoryBreakdown(),
     getAllUsers(),
     getSupportTickets(),
@@ -158,13 +145,19 @@ export default async function SjefenPage() {
         <TabsList>
           <TabsTrigger value="overview">Oversikt</TabsTrigger>
           <TabsTrigger value="users">Brukere</TabsTrigger>
-          <TabsTrigger value="support">Support</TabsTrigger>
+          <TabsTrigger value="support" className="relative">
+            Support
+            {stats.open_tickets > 0 && (
+              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {stats.open_tickets}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <AdminDashboard
             stats={stats}
-            userGrowth={userGrowth}
             categoryBreakdown={categoryBreakdown}
             recentActivity={recentActivity}
           />

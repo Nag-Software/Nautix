@@ -31,6 +31,15 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Update last_seen_at for authenticated users
+  if (user) {
+    try {
+      await supabase.rpc('update_last_seen', { user_id: user.id })
+    } catch {
+      // Silently fail if update fails - don't block the request
+    }
+  }
+
   // If user is not signed in and the current path is not /login or /signup, redirect to /login
   if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup')) {
     const url = request.nextUrl.clone()

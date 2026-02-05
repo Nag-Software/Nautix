@@ -15,9 +15,10 @@ BEGIN
         'id', u.id,
         'email', u.email,
         'created_at', u.created_at,
-        'last_sign_in_at', u.last_sign_in_at
+        'last_seen_at', COALESCE(up.last_seen_at, u.last_sign_in_at, u.created_at)
       )
       FROM auth.users u
+      LEFT JOIN user_profiles up ON up.id = u.id
       WHERE u.id = target_user_id
     ),
     'boats', (

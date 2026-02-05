@@ -1,6 +1,13 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart'
 import {
   BarChart,
   Bar,
@@ -33,11 +40,6 @@ interface AdminStats {
   total_messages: number
 }
 
-interface UserGrowthData {
-  month: string
-  users: number
-}
-
 interface CategoryData {
   name: string
   value: number
@@ -45,14 +47,40 @@ interface CategoryData {
 
 interface Props {
   stats: AdminStats
-  userGrowth: UserGrowthData[]
   categoryBreakdown: CategoryData[]
   recentActivity: any[]
 }
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4']
 
-export function AdminDashboard({ stats, userGrowth, categoryBreakdown, recentActivity }: Props) {
+const chartConfig = {
+  users: {
+    label: 'Brukere',
+    color: 'hsl(var(--chart-1))',
+  },
+}
+
+export function AdminDashboard({ stats, categoryBreakdown, recentActivity }: Props) {
+  const [period, setPeriod] = useState<'week' | 'month' | 'year'>('week')
+  const [userGrowth, setUserGrowth] = useState<Array<{ period: string; users: number }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchUserGrowth() {
+      setLoading(true)
+      try {
+        const response = await fetch(`/api/admin/user-growth?period=${period}`)
+        const data = await response.json()
+        setUserGrowth(data)
+      } catch (error) {
+        console.error('Error fetching user growth:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUserGrowth()
+  }, [period])
   const overviewData = [
     { name: 'Brukere', value: stats.total_users },
     { name: 'Båter', value: stats.total_boats },
@@ -171,36 +199,47 @@ export function AdminDashboard({ stats, userGrowth, categoryBreakdown, recentAct
         <Card>
           <CardHeader>
             <CardTitle>Brukervekst</CardTitle>
-            <CardDescription>Månedlig brukervekst</CardDescription>
+            <CardDescription>
+              {period === 'week' && 'Siste 7 dager'}
+              {period === 'month' && 'Siste 12 måneder'}
+              {period === 'year' && 'Siste 5 år'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={userGrowth}>
-                <defs>
-                  <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '6px',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="users"
-                  stroke="#3b82f6"
-                  fillOpacity={1}
-                  fill="url(#colorUsers)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <Tabs value={period} onValueChange={(v) => setPeriod(v as 'week' | 'month' | 'year')} className="mb-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="week">Uke</TabsTrigger>
+                <TabsTrigger value="month">Måned</TabsTrigger>
+                <TabsTrigger value="year">År</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {loading ? (
+              <div className="flex h-[300px] items-center justify-center">
+                <p className="text-sm text-muted-foreground">Laster...</p>
+              </div>
+            ) : (
+              <ChartContainer config={chartConfig} className="h-[300px]">
+                <AreaChart data={userGrowth}>
+                  <defs>
+                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="period" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area
+                    type="monotone"
+                    dataKey="users"
+                    stroke="#3b82f6"
+                    fillOpacity={1}
+                    fill="url(#colorUsers)"
+                  />
+                </AreaChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
 

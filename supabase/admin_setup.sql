@@ -167,13 +167,16 @@ COMMENT ON TABLE admin_users IS 'Tracks which users have admin privileges';
 COMMENT ON FUNCTION is_admin IS 'Returns true if the given user_id has admin privileges';
 COMMENT ON VIEW admin_analytics IS 'Aggregate statistics for admin dashboard';
 
+-- Drop existing function first (needed when changing return type)
+DROP FUNCTION IF EXISTS get_all_users_with_stats();
+
 -- Create function to get all users with stats (admin only)
 CREATE OR REPLACE FUNCTION get_all_users_with_stats()
 RETURNS TABLE (
   id UUID,
   email TEXT,
   created_at TIMESTAMPTZ,
-  last_sign_in_at TIMESTAMPTZ,
+  last_seen_at TIMESTAMPTZ,
   boat_count BIGINT,
   conversation_count BIGINT,
   is_admin BOOLEAN
@@ -189,11 +192,12 @@ BEGIN
     u.id,
     u.email::TEXT,
     u.created_at,
-    u.last_sign_in_at,
+    COALESCE(up.last_seen_at, u.last_sign_in_at, u.created_at) as last_seen_at,
     COALESCE(b.boat_count, 0) as boat_count,
     COALESCE(c.conversation_count, 0) as conversation_count,
     EXISTS(SELECT 1 FROM admin_users au WHERE au.user_id = u.id) as is_admin
   FROM auth.users u
+  LEFT JOIN user_profiles up ON up.id = u.id
   LEFT JOIN (
     SELECT user_id, COUNT(*) as boat_count
     FROM boats
