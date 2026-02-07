@@ -37,16 +37,25 @@ export function NotificationsPanel() {
   const [forumPosts, setForumPosts] = useState<ForumNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [isMarkingRead, setIsMarkingRead] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const totalCount = reminders.length + forumPosts.reduce((sum, post) => sum + post.unread_comment_count, 0)
 
   useEffect(() => {
+    if (open) {
+      // Fetch immediately when panel opens
+      fetchNotifications()
+    }
+  }, [open])
+
+  useEffect(() => {
+    // Initial fetch
     fetchNotifications()
 
-    // Refresh every minute
-    const interval = setInterval(fetchNotifications, 60000)
+    // Refresh every 2 minutes (not too aggressive)
+    const interval = setInterval(fetchNotifications, 120000)
     return () => clearInterval(interval)
   }, [])
 
@@ -168,7 +177,8 @@ export function NotificationsPanel() {
                     <DropdownMenuItem
                       key={reminder.id}
                       className="cursor-pointer flex-col items-start p-3 focus:bg-muted"
-                      onClick={() => {
+                      onSelect={(e) => {
+                        e.preventDefault()
                         setOpen(false)
                         router.push("/vedlikehold/paminnelser")
                       }}
@@ -218,9 +228,35 @@ export function NotificationsPanel() {
                   <DropdownMenuItem
                     key={post.id}
                     className="cursor-pointer flex-col items-start p-3 focus:bg-muted"
-                    onClick={() => {
-                      setOpen(false)
-                      router.push(`/forum?post=${post.id}`)
+                    onSelect={async (e) => {
+                      e.preventDefault() // Prevent default close behavior
+                      
+                      if (isMarkingRead) return // Prevent multiple clicks
+                      
+                      setIsMarkingRead(true)
+                      
+                      try {
+                        // Optimistically remove from list
+                        setForumPosts(prev => prev.filter(p => p.id !== post.id))
+                        
+                        // Mark as read on server - wait for it to complete
+                        await fetch(`/api/forum/posts/${post.id}/mark-read`, {
+                          method: 'POST'
+                        })
+                        
+                        // Close panel
+                        setOpen(false)
+                        
+                        // Navigate after marking as read
+                        router.push(`/forum?post=${post.id}`)
+                      } catch (error) {
+                        console.error("Error marking post as read:", error)
+                        // Still navigate even if marking failed
+                        setOpen(false)
+                        router.push(`/forum?post=${post.id}`)
+                      } finally {
+                        setIsMarkingRead(false)
+                      }
                     }}
                   >
                     <div className="flex items-start gap-2 w-full">
