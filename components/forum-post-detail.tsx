@@ -44,6 +44,7 @@ interface Post {
   author: {
     id: string
     email: string
+    display_name?: string
   }
   author_stats: {
     rank: string
@@ -59,6 +60,7 @@ interface Comment {
   author: {
     id: string
     email: string
+    display_name?: string
   }
   author_stats: {
     rank: string
