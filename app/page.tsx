@@ -16,7 +16,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { IconMessageCircle, IconUser } from "@tabler/icons-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -38,8 +38,26 @@ interface AIAction {
   confirmationMessage: string
 }
 
-export default function Page() {
+function ConversationLoader({ 
+  onLoadConversation 
+}: { 
+  onLoadConversation: (convId: string) => void 
+}) {
   const searchParams = useSearchParams()
+  const loadedConversationRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const convId = searchParams.get('conversation')
+    if (convId && convId !== loadedConversationRef.current) {
+      loadedConversationRef.current = convId
+      onLoadConversation(convId)
+    }
+  }, [searchParams, onLoadConversation])
+
+  return null
+}
+
+function PageContent() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -47,16 +65,11 @@ export default function Page() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const loadedConversationRef = useRef<string | null>(null)
 
-  // Load conversation from URL parameter
-  useEffect(() => {
-    const convId = searchParams.get('conversation')
-    if (convId && convId !== conversationId && convId !== loadedConversationRef.current) {
-      loadedConversationRef.current = convId
-      loadConversation(convId)
-    }
-  }, [searchParams, conversationId])
-
   const loadConversation = async (convId: string) => {
+    if (convId === conversationId || convId === loadedConversationRef.current) {
+      return // Already loaded
+    }
+    loadedConversationRef.current = convId
     setLoadingConversation(true)
     try {
       const supabase = createClient()
@@ -572,7 +585,11 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
   }
 
   return (
-    <SidebarProvider>
+    <>
+      <Suspense fallback={null}>
+        <ConversationLoader onLoadConversation={loadConversation} />
+      </Suspense>
+      <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
@@ -693,5 +710,10 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
         </main>
       </SidebarInset>
     </SidebarProvider>
+    </>
   )
+}
+
+export default function Page() {
+  return <PageContent />
 }
