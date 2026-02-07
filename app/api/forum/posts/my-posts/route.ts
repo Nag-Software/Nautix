@@ -22,7 +22,23 @@ export async function GET() {
       return NextResponse.json([])
     }
 
-    return NextResponse.json(posts || [])
+    // For each post, get the unread comment count
+    const postsWithUnread = await Promise.all(
+      (posts || []).map(async (post) => {
+        const { data: unreadCount } = await supabase
+          .rpc('get_unread_comment_count', {
+            p_post_id: post.id,
+            p_user_id: user.id
+          })
+        
+        return {
+          ...post,
+          unread_comment_count: unreadCount || 0
+        }
+      })
+    )
+
+    return NextResponse.json(postsWithUnread)
   } catch (error) {
     console.error('Error fetching user posts:', error)
     return NextResponse.json([])

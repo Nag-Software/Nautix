@@ -17,17 +17,19 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { useState, useRef, useEffect } from "react"
-import { IconSparkles, IconUser } from "@tabler/icons-react"
+import { IconMessageCircle, IconUser } from "@tabler/icons-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { LinkifiedText } from "@/components/linkified-text"
+import { useSearchParams } from "next/navigation"
 
 interface Message {
   id: string
   role: "user" | "assistant"
   content: string
   timestamp: Date
+  images?: string[] // Base64 eller URL-er til bilder
 }
 
 interface AIAction {
@@ -37,10 +39,73 @@ interface AIAction {
 }
 
 export default function Page() {
+  const searchParams = useSearchParams()
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [loadingConversation, setLoadingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const loadedConversationRef = useRef<string | null>(null)
+
+  // Load conversation from URL parameter
+  useEffect(() => {
+    const convId = searchParams.get('conversation')
+    if (convId && convId !== conversationId && convId !== loadedConversationRef.current) {
+      loadedConversationRef.current = convId
+      loadConversation(convId)
+    }
+  }, [searchParams, conversationId])
+
+  const loadConversation = async (convId: string) => {
+    setLoadingConversation(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error("Du må være logget inn")
+        return
+      }
+
+      // Verify conversation belongs to user
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', convId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (convError || !conversation) {
+        toast.error("Kunne ikke laste samtale")
+        return
+      }
+
+      // Load messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: true })
+
+      if (messagesError) throw messagesError
+
+      // Convert to Message format
+      const loadedMessages: Message[] = (messagesData || []).map(msg => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+      }))
+
+      setMessages(loadedMessages)
+      setConversationId(convId)
+      toast.success(`Samtale lastet: ${conversation.title}`)
+    } catch (error) {
+      console.error('Error loading conversation:', error)
+      toast.error("Kunne ikke laste samtale")
+    } finally {
+      setLoadingConversation(false)
+    }
+  }
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -249,7 +314,7 @@ export default function Page() {
     return false
   }
 
-  const handleSubmit = async (prompt: string) => {
+  const handleSubmit = async (prompt: string, files?: { id: string; name: string; file: File; preview?: string }[]) => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -257,11 +322,14 @@ export default function Page() {
       return
     }
 
+    const images = files?.filter(f => f.preview).map(f => f.preview!) || []
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: prompt,
-      timestamp: new Date()
+      timestamp: new Date(),
+      images: images.length > 0 ? images : undefined
     }
     
     setMessages((prev) => [...prev, userMessage])
@@ -293,7 +361,8 @@ export default function Page() {
       // Send the last 5 messages for context
       const recentMessages = [...messages, userMessage].slice(-5).map(m => ({
         role: m.role,
-        content: m.content
+        content: m.content,
+        images: m.images
       }))
       
       const response = await fetch("/api/suggest", {
@@ -301,7 +370,8 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           prompt,
-          chatHistory: recentMessages
+          chatHistory: recentMessages,
+          images: images.length > 0 ? images : undefined
         })
       })
 
@@ -493,8 +563,12 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
   }
 
   const startNewConversation = () => {
+    // Clear URL param and reset state
+    window.history.pushState({}, '', '/')
     setConversationId(null)
     setMessages([])
+    loadedConversationRef.current = null
+    toast.success("Ny samtale startet")
   }
 
   return (
@@ -502,7 +576,7 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
-          <div className="flex items-center gap-2 px-4">
+          <div className="flex items-center gap-2 px-4 w-full">
             <SidebarTrigger className="-ml-1" />
             <Separator
               orientation="vertical"
@@ -521,6 +595,11 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+            {loadingConversation && (
+              <div className="ml-auto text-xs text-muted-foreground animate-pulse">
+                Laster samtale...
+              </div>
+            )}
           </div>
         </header>
         <main className="flex flex-1 flex-col overflow-hidden">
@@ -536,38 +615,50 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
                     <div
                       key={message.id}
                       className={cn(
-                        "flex gap-4",
+                        "flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300",
                         message.role === "user" ? "justify-end" : "justify-start"
                       )}
                     >
                       {message.role === "assistant" && (
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
-                          <IconSparkles size={18} className="text-primary-foreground" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm">
+                          <IconMessageCircle size={18} className="text-primary-foreground" />
                         </div>
                       )}
                       <div
                         className={cn(
-                          "rounded-2xl px-4 py-3 max-w-[80%]",
+                          "rounded-2xl px-4 py-3 max-w-[80%] shadow-sm flex flex-col gap-2",
                           message.role === "user"
                             ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
+                            : "bg-muted/60 backdrop-blur-sm"
                         )}
                       >
+                        {message.images && message.images.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {message.images.map((img, idx) => (
+                              <img 
+                                key={idx} 
+                                src={img} 
+                                alt="Vedlagt bilde" 
+                                className="max-w-xs max-h-64 rounded-lg border shadow-sm object-cover" 
+                              />
+                            ))}
+                          </div>
+                        )}
                         <LinkifiedText text={message.content} className="text-sm" />
                       </div>
                       {message.role === "user" && (
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted shadow-sm">
                           <IconUser size={18} className="text-muted-foreground" />
                         </div>
                       )}
                     </div>
                   ))}
                   {isLoading && (
-                    <div className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
-                        <IconSparkles size={18} className="text-primary-foreground" />
+                    <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm">
+                        <IconMessageCircle size={18} className="text-primary-foreground animate-pulse" />
                       </div>
-                      <div className="rounded-2xl bg-muted px-4 py-3">
+                      <div className="rounded-2xl bg-muted/60 backdrop-blur-sm px-4 py-3 shadow-sm">
                         <div className="flex gap-1">
                           <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "0ms" }} />
                           <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: "150ms" }} />
@@ -579,14 +670,19 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
                   <div ref={messagesEndRef} />
                 </div>
               </div>
-              <div className="border-t bg-background p-4">
+              <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4">
                 <div className="mx-auto max-w-3xl">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-xs text-muted-foreground">
                       {conversationId ? "Aktiv samtale lagres automatisk" : "Ny samtale opprettes ved første melding"}
                     </div>
                     {messages.length > 0 && (
-                      <button className="text-xs underline" onClick={startNewConversation}>Start ny samtale</button>
+                      <button 
+                        className="text-xs text-primary hover:underline transition-all hover:text-primary/80" 
+                        onClick={startNewConversation}
+                      >
+                        Start ny samtale
+                      </button>
                     )}
                   </div>
                   <Ai04 onSubmit={handleSubmit} compact />

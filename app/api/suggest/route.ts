@@ -122,7 +122,7 @@ function extractResponseText(response: any): string {
 
 async function createWebSearchResponse(opts: {
   model: string
-  messages: Array<{ role: string; content: string }>
+  messages: Array<{ role: string; content: string | any[] }>
   temperature?: number
   maxOutputTokens?: number
   searchContextSize?: 'low' | 'medium' | 'high'
@@ -167,6 +167,7 @@ export async function POST(request: Request) {
       chatHistory,
       webSearch,
       webSearchContextSize,
+      images,
     } = body
 
     // Handle general chat prompt with action detection
@@ -193,19 +194,26 @@ export async function POST(request: Request) {
         // Fetch recent maintenance logs
         const { data: recentMaintenance } = await supabase
           .from('maintenance_log')
-          .select('title, category, type, date')
+          .select('*')
           .eq('user_id', user.id)
           .order('date', { ascending: false })
-          .limit(10)
+          .limit(20)
         
         // Fetch active reminders
         const { data: reminders } = await supabase
           .from('reminders')
-          .select('title, category, due_date, priority')
+          .select('*')
           .eq('user_id', user.id)
-          .eq('status', 'active')
           .order('due_date', { ascending: true })
-          .limit(10)
+          .limit(20)
+        
+        // Fetch user's documents (both stored files and links)
+        const { data: documentLinks } = await supabase
+          .from('document_links')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(30)
         
         // Build context string
         if (boats && boats.length > 0) {
@@ -228,16 +236,35 @@ export async function POST(request: Request) {
         }
         
         if (recentMaintenance && recentMaintenance.length > 0) {
-          userContext += "\n**NYLIG VEDLIKEHOLD (siste 10):**\n"
+          userContext += "\n**VEDLIKEHOLDSLOGG (siste 20):**\n"
           recentMaintenance.forEach((log: any) => {
             userContext += `- ${log.date}: ${log.title} (${log.category}/${log.type})\n`
+            if (log.description) userContext += `  Beskrivelse: ${log.description}\n`
+            if (log.parts_used) userContext += `  Deler brukt: ${log.parts_used}\n`
+            if (log.cost) userContext += `  Kostnad: ${log.cost} kr\n`
+            if (log.notes) userContext += `  Notater: ${log.notes}\n`
           })
         }
         
         if (reminders && reminders.length > 0) {
-          userContext += "\n**AKTIVE PÅMINNELSER:**\n"
+          userContext += "\n**PÅMINNELSER (neste 20):**\n"
           reminders.forEach((reminder: any) => {
-            userContext += `- ${reminder.title} - Forfaller: ${reminder.due_date} (${reminder.priority})\n`
+            const status = reminder.completed ? '✓' : '○'
+            userContext += `${status} ${reminder.title} - Forfaller: ${reminder.due_date} (${reminder.priority})\n`
+            if (reminder.description) userContext += `  Beskrivelse: ${reminder.description}\n`
+            if (reminder.recurrence && reminder.recurrence !== 'none') {
+              userContext += `  Gjentagelse: ${reminder.recurrence}\n`
+            }
+          })
+        }
+        
+        if (documentLinks && documentLinks.length > 0) {
+          userContext += "\n**BRUKERENS DOKUMENTER (siste 30):**\n"
+          documentLinks.forEach((doc: any) => {
+            userContext += `- ${doc.title} (${doc.type})\n`
+            if (doc.description) userContext += `  Beskrivelse: ${doc.description}\n`
+            if (doc.url) userContext += `  URL: ${doc.url}\n`
+            if (doc.file_path) userContext += `  Fil lagret i system\n`
           })
         }
       }
@@ -249,6 +276,24 @@ export async function POST(request: Request) {
           content: `Du er en proaktiv AI-assistent for båteiere, ekspert på båter, båtmotorer, og båtvedlikehold. Du skal være frempå og hjelpe mest mulig med konkrete neste steg.
 
 ${userContext}
+
+VIKTIG - SØKING I BRUKERENS DATA:
+Du har tilgang til brukerens:
+- Vedlikeholdslogg (komplett historikk med detaljer)
+- Påminnelser (alle aktive og planlagte)
+- Dokumenter (lagrede manualer, PDF-er, lenker)
+- Båt- og motorinformasjon
+
+Når brukeren spør om noe relatert til deres egne data (f.eks. "når byttet jeg olje sist?", "hva står i min manual om X?", "har jeg noen påminnelser om Y?"), SØK NØYE gjennom dataene ovenfor og gi KONKRETE svar basert på brukerens faktiske data.
+
+EKSEMPLER PÅ SPØRSMÅL OM BRUKERDATA:
+- "Når byttet jeg olje sist?" → Sjekk VEDLIKEHOLDSLOGG etter oljeskift
+- "Hva har jeg gjort med motoren i år?" → Sjekk VEDLIKEHOLDSLOGG (category: motor)
+- "Når skal jeg ha neste vedlikehold?" → Sjekk PÅMINNELSER
+- "Har jeg manualen til min motor?" → Sjekk BRUKERENS DOKUMENTER
+- "Hva står i manualen min om X?" → Hvis dokument finnes, referer til det og be brukeren åpne det for detaljer
+- "Hvor mye har jeg brukt på vedlikehold?" → Summer opp cost fra VEDLIKEHOLDSLOGG
+- "Hvilke deler har jeg byttet?" → Sjekk parts_used i VEDLIKEHOLDSLOGG
 
 VIKTIG - DU KAN UTFØRE FØLGENDE HANDLINGER AUTOMATISK:
 1. Legge til vedlikeholdslogg-oppføring
@@ -262,37 +307,31 @@ VIKTIG - HVORDAN DU SVARER:
 - Hvis du bruker web-søk for å finne informasjon, PRESENTER funnene direkte i svaret ditt.
 - Når du henviser til en manual/kilde, inkluder relevant utdrag/informasjon i svaret OG lenk til kilden.
 - Brukeren skal få svaret sitt UTEN å måtte åpne eksterne lenker (lenkene er supplement/verifisering).
-- Eksempel RIKTIG: "MD11D bruker 3,5 liter motorolje (SAE 15W-40). Oljeskift anbefales hver 100 timer. Kilde: Volvo Penta MD11D Manual (https://...)".
-- Eksempel FEIL: "Du finner denne informasjonen i manualen her: https://...".
+- Eksempel RIKTIG: "MD11D bruker 3,5 liter motorolje (SAE 15W-40). Oljeskift anbefales hver 100 timer. Kilde: Volvo Penta MD11D Manual https://..."
+- Eksempel FEIL: "Du finner denne informasjonen i manualen her: https://..."
 - VIKTIG: Kun del lenker fra pålitelige kilder (offisielle produsenters nettsider, anerkjente PDF-databaser). Systemet vil validere at lenkene er aktive.
 
 FORMATERING AV SVAR:
-- IKKE bruk markdown-formatering som ** (bold) eller __ (underline) i svaret ditt.
-- IKKE bruk formatet ([tekst](url)) - skriv bare vanlig tekst og URL-en direkte.
-- Lenker skal formateres slik: "Kilde: Beskrivelse https://url-her.com" eller bare "https://url-her.com"
-- Eksempel RIKTIG: "Du finner mer informasjon på Yamaha sitt nettsted: https://yamaha.com/manual"
-- Eksempel FEIL: "Du finner mer informasjon **her** ([Yamaha](https://yamaha.com/manual))"
-- Bruk linjeskift og kulepunkter (-, •) for å strukturere informasjon, men IKKE markdown.
+- Bruk enkel markdown: **fet**, *kursiv*, lister med -, overskrifter med #
+- Lenker skal formateres slik: "Kilde: Beskrivelse https://url-her.com"
+- Bruk linjeskift og struktur for lesbarhet
+- Unngå komplisert formatering
 
 HVIS DU IKKE FINNER DET BRUKEREN BER OM:
-- ALDRI bare si "Jeg fant det ikke" eller "Jeg har dessverre ikke funnet...".
-- ALLTID foreslå et nyttig alternativ eller beslektet informasjon som kan hjelpe.
-- Eksempel: Hvis bruker ber om en manual du ikke finner, foreslå å søke etter spesifikasjoner, teknisk data, eller lignende båtmodeller som kan ha relevant info.
-- Eksempel: Hvis bruker ber om tegninger du ikke finner, foreslå å sjekke spesifikasjoner, dimensjoner, eller kontaktinfo til produsent.
-- Vær proaktiv - hjelp brukeren videre med alternative løsninger.
+- ALDRI bare si "Jeg fant det ikke" eller "Jeg har dessverre ikke funnet..."
+- ALLTID foreslå et nyttig alternativ eller beslektet informasjon som kan hjelpe
+- Eksempel: Hvis bruker ber om en manual du ikke finner, foreslå å søke etter spesifikasjoner, teknisk data, eller lignende båtmodeller som kan ha relevant info
+- Vær proaktiv - hjelp brukeren videre med alternative løsninger
 
 PROAKTIV DOKUMENTHÅNDTERING:
-- Når det er relevant for samtalen (f.eks. feilsøking, vedlikehold, spesifikasjoner, prosedyrer), foreslå å finne og laste ned riktig brukermanual/verkstedmanual/datablad.
-- KRITISK REGEL: Når du foreslår et dokument, MÅ du inkludere URL-en BÅDE i "response"-teksten OG i "suggest_document"-action.
-- Eksempel: "Du kan laste ned manualen her: https://example.com/manual.pdf" I TILLEGG til suggest_document-action.
-- ALDRI si "Du kan laste ned manualen her:" uten å inkludere den faktiske URL-en i teksten.
+- Når det er relevant for samtalen (f.eks. feilsøking, vedlikehold, spesifikasjoner, prosedyrer), foreslå å finne og laste ned riktig brukermanual/verkstedmanual/datablad
+- KRITISK REGEL: Når du foreslår et dokument, MÅ du inkludere URL-en BÅDE i "response"-teksten OG i "suggest_document"-action
+- Eksempel: "Du kan laste ned manualen her: https://example.com/manual.pdf" I TILLEGG til suggest_document-action
+- ALDRI si "Du kan laste ned manualen her:" uten å inkludere den faktiske URL-en i teksten
 - Nedlastbare filtyper (lagres i dokumentarkiv): .pdf, .doc, .docx, .txt, .jpg, .jpeg, .png, .gif, .xls, .xlsx, .csv, .ppt, .pptx, .zip, .rar
 - IKKE nedlastbare filtyper (lagres kun som lenker): .html, .htm, nettsider
-- Hvis du anbefaler et konkret dokument, inkluder URL-en i teksten OG legg det inn som en action av typen "suggest_document".
-- Begge må ha SAMME URL - én i "response" (synlig for bruker) og én i "suggest_document"-action (for nedlasting).
-- Ikke si at du har "lagt til" eller "lastet opp" dokumenter hvis du ikke sender en "suggest_document"-action.
-- suggest_document er et SUPPLEMENT til svaret ditt - ikke hovedsvaret.
-- Sjekk alltid om URL-en inneholder et filnavn med endelse - hvis ja, send suggest_document.
+- Hvis du anbefaler et konkret dokument, inkluder URL-en i teksten OG legg det inn som en action av typen "suggest_document"
+- Begge må ha SAMME URL - én i "response" (synlig for bruker) og én i "suggest_document"-action (for nedlasting)
 
 DIN OPPGAVE:
 Analyser brukerens forespørsel og identifiser om det skal utføres en handling. BRUK brukerens faktiske båt- og motorinformasjon når du svarer og foreslår handlinger.
@@ -476,29 +515,117 @@ HANDLINGS-REGLER:
       
       // Add chat history if available
       if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
-        messages.push(...chatHistory)
+        // Convert chat history with potential images
+        for (const msg of chatHistory) {
+          if (msg.images && msg.images.length > 0) {
+            // Message with images - use Responses API format
+            const content: any[] = [
+              { type: 'input_text', text: msg.content }
+            ]
+            for (const image of msg.images) {
+              // Extract base64 data from data URL
+              const base64Data = image.startsWith('data:') 
+                ? image.split(',')[1] 
+                : image
+                
+              content.push({
+                type: 'input_image',
+                image: base64Data
+              })
+            }
+            messages.push({
+              role: msg.role,
+              content
+            })
+          } else {
+            // Text-only message
+            messages.push({
+              role: msg.role,
+              content: msg.content
+            })
+          }
+        }
       } else {
-        // If no history, add the current user prompt
-        messages.push({
-          role: 'user',
-          content: userPrompt,
-        })
+        // If no history, add the current user prompt with images if any
+        if (images && images.length > 0) {
+          const content: any[] = [
+            { type: 'input_text', text: userPrompt }
+          ]
+          for (const image of images) {
+            // Extract base64 data from data URL
+            const base64Data = image.startsWith('data:') 
+              ? image.split(',')[1] 
+              : image
+              
+            content.push({
+              type: 'input_image',
+              image: base64Data
+            })
+          }
+          messages.push({
+            role: 'user',
+            content
+          })
+        } else {
+          messages.push({
+            role: 'user',
+            content: userPrompt,
+          })
+        }
       }
-      // VANLIG SAMTALE - Always use web search for better results
+      // VANLIG SAMTALE
       let responseText = ''
-      const response = await createWebSearchResponse({
-        model: 'gpt-4.1-mini',
-        messages,
-        temperature: 0.7,
-        maxOutputTokens: 1500,
-        searchContextSize:
-          webSearchContextSize === 'low' ||
-          webSearchContextSize === 'medium' ||
-          webSearchContextSize === 'high'
-            ? webSearchContextSize
-            : 'medium',
-      })
-      responseText = extractResponseText(response)
+      
+      // Check if any message contains images
+      const hasImages = images && images.length > 0
+      
+      if (hasImages) {
+        // Use Chat Completions API for vision support (no web search with images)
+        const chatMessages = messages.map(msg => {
+          if (typeof msg.content === 'string') {
+            return msg
+          }
+          // Convert to Chat Completions format
+          const content: any[] = []
+          for (const part of msg.content) {
+            if (part.type === 'input_text') {
+              content.push({ type: 'text', text: part.text })
+            } else if (part.type === 'input_image') {
+              content.push({
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${part.image}`
+                }
+              })
+            }
+          }
+          return { role: msg.role, content }
+        })
+        
+        const chatResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: chatMessages as any,
+          temperature: 0.7,
+          max_tokens: 1500,
+        })
+        
+        responseText = chatResponse.choices[0]?.message?.content || ''
+      } else {
+        // Use Responses API with web search for text-only
+        const response = await createWebSearchResponse({
+          model: 'gpt-4.1-mini',
+          messages,
+          temperature: 0.7,
+          maxOutputTokens: 1500,
+          searchContextSize:
+            webSearchContextSize === 'low' ||
+            webSearchContextSize === 'medium' ||
+            webSearchContextSize === 'high'
+              ? webSearchContextSize
+              : 'medium',
+        })
+        responseText = extractResponseText(response)
+      }
       
       try {
         // Try to parse as JSON

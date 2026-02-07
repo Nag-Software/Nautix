@@ -106,9 +106,19 @@ export default function RemindersPage() {
   const [pendingAction, setPendingAction] = useState<{ id: string; type: string } | null>(null)
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
   const [newReminderOpen, setNewReminderOpen] = useState(false)
+  const [editReminderOpen, setEditReminderOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [updating, setUpdating] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [newReminderData, setNewReminderData] = useState({
+    title: "",
+    description: "",
+    due_date: "",
+    priority: "medium" as "high" | "medium" | "low",
+    category: "annet",
+  })
+  const [editReminderData, setEditReminderData] = useState({
+    id: "",
     title: "",
     description: "",
     due_date: "",
@@ -282,6 +292,64 @@ export default function RemindersPage() {
       toast.error("Kunne ikke slette påminnelse")
     } finally {
       setPendingAction(null)
+    }
+  }
+
+  const openEditDialog = (reminder: Reminder) => {
+    setEditReminderData({
+      id: reminder.id,
+      title: reminder.title,
+      description: reminder.description,
+      due_date: reminder.due_date,
+      priority: reminder.priority,
+      category: reminder.category,
+    })
+    setEditReminderOpen(true)
+  }
+
+  const updateReminder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setUpdating(true)
+
+    try {
+      const supabase = createClient()
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error("Du må være logget inn")
+        return
+      }
+
+      const { error } = await supabase
+        .from("reminders")
+        .update({
+          title: editReminderData.title,
+          description: editReminderData.description,
+          due_date: editReminderData.due_date,
+          priority: editReminderData.priority,
+          category: editReminderData.category,
+        })
+        .eq("id", editReminderData.id)
+
+      if (error) throw error
+
+      toast.success("Påminnelse oppdatert")
+      setEditReminderOpen(false)
+      setSelectedReminder(null)
+      setEditReminderData({
+        id: "",
+        title: "",
+        description: "",
+        due_date: "",
+        priority: "medium",
+        category: "annet",
+      })
+      fetchReminders()
+    } catch (error) {
+      console.error("Error updating reminder:", error)
+      toast.error("Kunne ikke oppdatere påminnelse")
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -572,7 +640,6 @@ export default function RemindersPage() {
                       <TableRow className="hover:bg-transparent border-b">
                         <TableHead className="h-12 px-4 font-medium">Påminnelse</TableHead>
                         <TableHead className="h-12 px-4 font-medium">Kategori</TableHead>
-                        <TableHead className="h-12 px-4 font-medium">Status</TableHead>
                         <TableHead className="h-12 px-4 font-medium">Prioritet</TableHead>
                         <TableHead className="h-12 px-4 font-medium">Forfallsdato</TableHead>
                         <TableHead className="h-12 px-4 font-medium">Beskrivelse</TableHead>
@@ -613,9 +680,6 @@ export default function RemindersPage() {
                             </TableCell>
                             <TableCell className="h-16 px-4 text-sm text-muted-foreground capitalize">
                               {reminder.category}
-                            </TableCell>
-                            <TableCell className="h-16 px-4">
-                              {getStatusBadge(reminder)}
                             </TableCell>
                             <TableCell className="h-16 px-4">
                               {getPriorityBadge(reminder.priority)}
@@ -827,7 +891,18 @@ export default function RemindersPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 pt-4 border-t">
+                  <div className="flex flex-col gap-2 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        openEditDialog(selectedReminder)
+                        setSelectedReminder(null)
+                      }}
+                      className="w-full"
+                    >
+                      Rediger påminnelse
+                    </Button>
+                    <div className="flex items-center gap-2">
                     {!selectedReminder.completed ? (
                       <Button
                         onClick={() => {
@@ -877,6 +952,7 @@ export default function RemindersPage() {
                       )}
                       Slett
                     </Button>
+                    </div>
                   </div>
                 </div>
               </>
@@ -885,9 +961,109 @@ export default function RemindersPage() {
         </SheetContent>
       </Sheet>
 
+      {/* Edit Reminder Dialog */}
+      <Dialog open={editReminderOpen} onOpenChange={setEditReminderOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rediger påminnelse</DialogTitle>
+            <DialogDescription>
+              Oppdater påminnelsens detaljer
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={updateReminder} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit_title">Tittel *</Label>
+              <Input
+                id="edit_title"
+                placeholder="F.eks. Skifte motorolje"
+                value={editReminderData.title}
+                onChange={(e) => setEditReminderData({ ...editReminderData, title: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_description">Beskrivelse</Label>
+              <Textarea
+                id="edit_description"
+                placeholder="Ytterligere detaljer..."
+                value={editReminderData.description}
+                onChange={(e) => setEditReminderData({ ...editReminderData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_category">Kategori *</Label>
+                <Select
+                  value={editReminderData.category}
+                  onValueChange={(value) => setEditReminderData({ ...editReminderData, category: value })}
+                >
+                  <SelectTrigger id="edit_category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="motor">Motor</SelectItem>
+                    <SelectItem value="skrog">Skrog</SelectItem>
+                    <SelectItem value="elektrisitet">Elektrisitet</SelectItem>
+                    <SelectItem value="sikkerhet">Sikkerhet</SelectItem>
+                    <SelectItem value="sesong">Sesong</SelectItem>
+                    <SelectItem value="annet">Annet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit_priority">Prioritet *</Label>
+                <Select
+                  value={editReminderData.priority}
+                  onValueChange={(value) => setEditReminderData({ ...editReminderData, priority: value as "high" | "medium" | "low" })}
+                >
+                  <SelectTrigger id="edit_priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">Høy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Lav</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_due_date">Forfallsdato *</Label>
+              <Input
+                id="edit_due_date"
+                type="date"
+                value={editReminderData.due_date}
+                onChange={(e) => setEditReminderData({ ...editReminderData, due_date: e.target.value })}
+                required
+              />
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditReminderOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Avbryt
+              </Button>
+              <Button type="submit" disabled={updating} className="w-full sm:w-auto">
+                {updating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Oppdater påminnelse
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* New Reminder Dialog */}
       <Dialog open={newReminderOpen} onOpenChange={setNewReminderOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Ny påminnelse</DialogTitle>
             <DialogDescription>
@@ -917,14 +1093,14 @@ export default function RemindersPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Kategori *</Label>
                 <Select
                   value={newReminderData.category}
                   onValueChange={(value) => setNewReminderData({ ...newReminderData, category: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="category">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -944,7 +1120,7 @@ export default function RemindersPage() {
                   value={newReminderData.priority}
                   onValueChange={(value) => setNewReminderData({ ...newReminderData, priority: value as "high" | "medium" | "low" })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="priority">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

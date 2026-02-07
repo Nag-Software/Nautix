@@ -20,6 +20,7 @@ export interface ThreadedCommentData {
   author: {
     id: string
     email: string
+    display_name?: string
   }
   author_stats: {
     rank: string
@@ -50,7 +51,7 @@ export function ThreadedComment({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const commentAuthorStats = comment.author_stats?.[0] || { rank: 'Matros', points: 0 }
-  const commentEmailPrefix = comment.author.email.split('@')[0]
+  const displayName = comment.author.display_name || comment.author.email.split('@')[0]
   const hasReplies = (comment.replies?.length ?? 0) > 0
   const canReply = comment.depth < maxDepth
   const isLiked = likedComments.has(comment.id)
@@ -74,7 +75,7 @@ export function ThreadedComment({
   }
 
   // Get initials for avatar
-  const initials = commentEmailPrefix.slice(0, 2).toUpperCase()
+  const initials = displayName.slice(0, 2).toUpperCase()
 
   // Rank colors for avatar
   const rankColors = {
@@ -110,7 +111,7 @@ export function ThreadedComment({
           {/* Header */}
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="font-semibold text-sm hover:underline cursor-pointer">
-              {commentEmailPrefix}
+              {displayName}
             </span>
             <span className="text-xs text-muted-foreground font-normal">
               {commentAuthorStats.rank}

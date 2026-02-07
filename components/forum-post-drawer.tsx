@@ -301,7 +301,7 @@ export function ForumPostDrawer({ postId, open, onClose, onEdit, onDelete }: For
   }
 
   const authorStats = post.author_stats?.[0] || { rank: 'Matros', points: 0 }
-  const emailPrefix = post.author.email.split('@')[0]
+  const displayName = post.author.display_name || post.author.email.split('@')[0]
   const topLevelComments = comments.filter(c => !c.parent_comment_id)
 
   return (
@@ -324,7 +324,7 @@ export function ForumPostDrawer({ postId, open, onClose, onEdit, onDelete }: For
             <SheetDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 text-left">
               <div className="flex items-center gap-1">
                 <RankBadge rank={authorStats.rank} />
-                <span className="font-medium text-foreground">{emailPrefix}</span>
+                <span className="font-medium text-foreground">{displayName}</span>
               </div>
               <span className="hidden sm:inline">•</span>
               <span>

@@ -41,6 +41,7 @@ interface Post {
   view_count: number
   like_count: number
   comment_count: number
+  unread_comment_count?: number
   created_at: string
   category: {
     name: string
@@ -86,6 +87,9 @@ export function MyPostsDialog({ onEditPost }: MyPostsDialogProps) {
     }
   }
 
+  // Calculate total unread count
+  const totalUnreadCount = posts.reduce((sum, post) => sum + (post.unread_comment_count || 0), 0)
+
   const handleDeleteClick = (postId: string) => {
     setPostToDelete(postId)
     setDeleteDialogOpen(true)
@@ -117,16 +121,25 @@ export function MyPostsDialog({ onEditPost }: MyPostsDialogProps) {
   const handleEdit = (postId: string) => {
     setOpen(false)
     onEditPost(postId)
+    // Refresh after a delay to update unread counts
+    setTimeout(() => {
+      if (open) fetchMyPosts()
+    }, 1000)
   }
 
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="gap-2 h-9 text-sm">
+          <Button variant="outline" className="gap-2 h-9 text-sm relative">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Mine innlegg</span>
             <span className="sm:hidden">Mine</span>
+            {!loading && totalUnreadCount > 0 && (
+              <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-xs">
+                {totalUnreadCount}
+              </Badge>
+            )}
           </Button>
         </DialogTrigger>
         <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[1000px] max-h-[85vh] sm:max-h-[90vh] p-0">
@@ -170,9 +183,14 @@ export function MyPostsDialog({ onEditPost }: MyPostsDialogProps) {
                             <ThumbsUp className="h-3 w-3" />
                             <span>{post.like_count}</span>
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 relative">
                             <MessageCircle className="h-3 w-3" />
                             <span>{post.comment_count}</span>
+                            {post.unread_comment_count && post.unread_comment_count > 0 && (
+                              <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px] leading-none">
+                                {post.unread_comment_count}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -246,6 +264,11 @@ export function MyPostsDialog({ onEditPost }: MyPostsDialogProps) {
                               <div className="flex items-center justify-center gap-1">
                                 <MessageCircle className="h-3 w-3 text-muted-foreground" />
                                 <span>{post.comment_count}</span>
+                                {post.unread_comment_count && post.unread_comment_count > 0 && (
+                                  <Badge variant="destructive" className="ml-1 h-4 px-1.5 text-[10px] leading-none">
+                                    {post.unread_comment_count} ny{post.unread_comment_count > 1 ? 'e' : ''}
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">

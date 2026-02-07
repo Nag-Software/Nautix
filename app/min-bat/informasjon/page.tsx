@@ -319,7 +319,7 @@ export default function BatInformasjonPage() {
         </header>
 
         <main className="flex flex-1 flex-col items-center px-4 py-6 sm:px-6 md:px-8 lg:px-12">
-          <div className="w-full max-w-5xl space-y-6">
+          <div className="w-full max-w-3xl space-y-6">
             <div className="flex items-center gap-3">
               <div className="rounded-full bg-primary/10 p-3">
                 <Ship className="h-6 w-6 text-primary" />

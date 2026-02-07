@@ -37,7 +37,6 @@ interface Equipment {
   name: string
   category: string
   status: "active" | "needs-service" | "expired"
-  expiry_date?: string
   purchase_date?: string
   cost?: string
   notes?: string
@@ -52,7 +51,6 @@ export default function UtstyrPage() {
     name: "",
     category: "",
     status: "active",
-    expiry_date: "",
     purchase_date: "",
     cost: "",
     notes: "",
@@ -109,7 +107,6 @@ export default function UtstyrPage() {
       name: "",
       category: "",
       status: "active",
-      expiry_date: "",
       purchase_date: "",
       cost: "",
       notes: "",
@@ -121,7 +118,6 @@ export default function UtstyrPage() {
     setEditingItem(item)
     setFormData({
       ...item,
-      expiry_date: item.expiry_date || "",
       purchase_date: item.purchase_date || "",
       cost: item.cost?.toString() || "",
       notes: item.notes || "",
@@ -156,7 +152,6 @@ export default function UtstyrPage() {
         name: formData.name,
         category: formData.category,
         status: formData.status,
-        expiry_date: formData.expiry_date || null,
         purchase_date: formData.purchase_date || null,
         cost: formData.cost ? parseFloat(formData.cost) : null,
         notes: formData.notes || null,
@@ -369,11 +364,6 @@ export default function UtstyrPage() {
                             <p className="text-sm text-muted-foreground">
                               Kategori: {item.category}
                             </p>
-                            {item.expiry_date && (
-                              <p className="text-xs text-muted-foreground">
-                                Utløpsdato: {new Date(item.expiry_date).toLocaleDateString('nb-NO')}
-                              </p>
-                            )}
                             {item.notes && (
                               <p className="text-xs text-muted-foreground mt-2">
                                 {item.notes}
@@ -441,25 +431,14 @@ export default function UtstyrPage() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="purchase_date">Kjøpsdato</Label>
-                  <Input
-                    id="purchase_date"
-                    type="date"
-                    value={formData.purchase_date}
-                    onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expiry_date">Utløpsdato</Label>
-                  <Input
-                    id="expiry_date"
-                    type="date"
-                    value={formData.expiry_date}
-                    onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="purchase_date">Kjøpsdato</Label>
+                <Input
+                  id="purchase_date"
+                  type="date"
+                  value={formData.purchase_date}
+                  onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cost">Kostnad (kr)</Label>

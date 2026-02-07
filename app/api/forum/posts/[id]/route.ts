@@ -9,6 +9,9 @@ export async function GET(
     const supabase = await createClient()
     const { id } = await params
     
+    // Get current user (if authenticated)
+    const { data: { user } } = await supabase.auth.getUser()
+    
     // Increment view count
     await supabase.rpc('increment_post_views', { post_id: id })
     
@@ -19,6 +22,11 @@ export async function GET(
       .single()
     
     if (error) throw error
+
+    // If user is authenticated and is the post author, mark as viewed
+    if (user && post.user_id === user.id) {
+      await supabase.rpc('update_post_view', { p_post_id: id })
+    }
 
     // Fetch user data separately
     const [profileResult, statsResult] = await Promise.all([

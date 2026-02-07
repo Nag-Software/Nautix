@@ -15,11 +15,13 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
+import Image from "next/image"
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationsPanel } from "@/components/notifications-panel"
 import { SupportDialog } from "@/components/support-dialog"
 import { FeedbackDialog } from "@/components/feedback-dialog"
 import {
@@ -170,6 +172,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
+                {/*}
                 <a href="#">
                   <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                     <Command className="size-4" />
@@ -178,7 +181,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <span className="truncate font-medium">Nautix</span>
                     <span className="truncate text-xs">Digital båtassistent</span>
                   </div>
-                  <ThemeToggle />
+                  <div className="flex items-center gap-1">
+                    <NotificationsPanel />
+                    <ThemeToggle />
+                  </div>
+                </a>
+                */}
+                <a href="/" >
+                  <div className="bg-sidebar-secondary text-sidebar-secondary-foreground flex justify-between items-center w-full">
+                      <Image src="/trans.png" alt="Nautix Logo" width={110} height={32} className="mr-2 dark:invert" />
+                      <div className="flex items-center gap-1">
+                        <NotificationsPanel />
+                        <ThemeToggle />
+                      </div>
+                    </div>
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>

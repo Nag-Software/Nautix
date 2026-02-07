@@ -151,6 +151,11 @@ export default function SamtalerPage() {
   }
 
   const handleOpenConversation = async (conversation: Conversation) => {
+    // Navigate to main page with conversation ID
+    router.push(`/?conversation=${conversation.id}`)
+  }
+
+  const handleViewConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation)
     setIsDrawerOpen(true)
     setLoadingMessages(true)
@@ -250,8 +255,64 @@ export default function SamtalerPage() {
               )}
             </div>
           ) : (
-            <div className="border rounded-lg">
-              <Table>
+            <>
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-2">
+                {conversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    onClick={() => handleOpenConversation(conversation)}
+                    className="rounded-lg border bg-card p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="rounded-full bg-primary/10 p-2 shrink-0">
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium text-sm line-clamp-2">
+                            {conversation.title}
+                          </span>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                            <span>{formatDate(conversation.updated_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Meny</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewConversation(conversation) }}>
+                            <Folder className="mr-2 h-4 w-4" />
+                            Forhåndsvis
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleArchive(conversation.id) }}>
+                            <Archive className="mr-2 h-4 w-4" />
+                            {showArchived ? 'Gjenopprett' : 'Arkiver'}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(e) => { e.stopPropagation(); handleDelete(conversation.id) }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Slett
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block border rounded-lg">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]" />
@@ -293,6 +354,11 @@ export default function SamtalerPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewConversation(conversation) }}>
+                              <Folder className="mr-2 h-4 w-4" />
+                              Forhåndsvis
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleArchive(conversation.id) }}>
                               <Archive className="mr-2 h-4 w-4" />
                               {showArchived ? 'Gjenopprett' : 'Arkiver'}
@@ -313,6 +379,7 @@ export default function SamtalerPage() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
 
           {conversations.length > 0 && (
@@ -345,33 +412,46 @@ export default function SamtalerPage() {
                   <div className="text-muted-foreground">Ingen meldinger i denne samtalen</div>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex gap-3 p-4 rounded-lg",
-                      message.role === 'user' ? "bg-primary/5 ml-8" : "bg-muted/50 mr-8"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-                        message.role === 'user' ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
-                      )}
-                    >
-                      {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">{message.role === 'user' ? 'Du' : 'AI04'}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(message.created_at).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                <>
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={cn(
+                          "flex gap-3 p-4 rounded-lg",
+                          message.role === 'user' ? "bg-primary/5 ml-8" : "bg-muted/50 mr-8"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
+                            message.role === 'user' ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
+                          )}
+                        >
+                          {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">{message.role === 'user' ? 'Du' : 'AI04'}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(message.created_at).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <LinkifiedText text={message.content} className="text-sm" />
+                        </div>
                       </div>
-                      <LinkifiedText text={message.content} className="text-sm" />
-                    </div>
+                    ))}
                   </div>
-                ))
+                  <div className="pt-4 border-t">
+                    <Button 
+                      onClick={() => handleOpenConversation(selectedConversation!)} 
+                      className="w-full"
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Fortsett samtale
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           </SheetContent>

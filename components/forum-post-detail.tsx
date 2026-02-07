@@ -234,7 +234,7 @@ export function ForumPostDetail({ postId, open, onClose, onEdit, onDelete }: For
   }
 
   const authorStats = post.author_stats?.[0] || { rank: 'Matros', points: 0 }
-  const emailPrefix = post.author.email.split('@')[0]
+  const displayName = post.author.display_name || post.author.email.split('@')[0]
 
   return (
     <>
@@ -252,7 +252,7 @@ export function ForumPostDetail({ postId, open, onClose, onEdit, onDelete }: For
             <DialogDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 text-xs sm:text-sm">
               <div className="flex items-center gap-1">
                 <RankBadge rank={authorStats.rank} />
-                <span className="font-medium text-foreground">{emailPrefix}</span>
+                <span className="font-medium text-foreground">{displayName}</span>
               </div>
               <span className="hidden sm:inline">•</span>
               <span>
@@ -345,14 +345,14 @@ export function ForumPostDetail({ postId, open, onClose, onEdit, onDelete }: For
                 <div className="space-y-3 sm:space-y-4">
                   {comments.map((comment) => {
                     const commentAuthorStats = comment.author_stats?.[0] || { rank: 'Matros', points: 0 }
-                    const commentEmailPrefix = comment.author.email.split('@')[0]
+                    const commentDisplayName = comment.author.display_name || comment.author.email.split('@')[0]
                     
                     return (
                       <div key={comment.id} className="rounded-lg border p-3 sm:p-4 space-y-2 sm:space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                             <RankBadge rank={commentAuthorStats.rank} />
-                            <span className="font-medium text-xs sm:text-sm truncate">{commentEmailPrefix}</span>
+                            <span className="font-medium text-xs sm:text-sm truncate">{commentDisplayName}</span>
                             <span className="text-xs text-muted-foreground hidden sm:inline">
                               {formatDistanceToNow(new Date(comment.created_at), {
                                 addSuffix: true,

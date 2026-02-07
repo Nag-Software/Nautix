@@ -121,7 +121,7 @@ export function CreatePostDialog({ categories, onPostCreated }: CreatePostDialog
           <span className="sm:hidden">Ny</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col overflow-y-auto">
         <SheetHeader className="px-4 pt-6 pb-4 sm:px-6 border-b">
           <SheetTitle>Opprett nytt innlegg</SheetTitle>
           <SheetDescription>

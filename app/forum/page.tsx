@@ -122,6 +122,14 @@ export default function ForumPage() {
     fetchPosts()
   }
 
+  const handlePostCreated = () => {
+    fetchPosts()
+    // Delay category refresh to ensure database trigger has completed
+    setTimeout(() => {
+      fetchCategories()
+    }, 500)
+  }
+
   const handlePostEdit = (postId: string) => {
     setSelectedPostId(null)
     setEditPostId(postId)
@@ -129,13 +137,19 @@ export default function ForumPage() {
 
   const handlePostDelete = () => {
     fetchPosts()
-    fetchCategories()
+    // Delay category refresh to ensure database trigger has completed
+    setTimeout(() => {
+      fetchCategories()
+    }, 500)
   }
 
   const handlePostUpdated = () => {
     setEditPostId(null)
     fetchPosts()
-    fetchCategories()
+    // Delay category refresh to ensure database trigger has completed
+    setTimeout(() => {
+      fetchCategories()
+    }, 500)
   }
 
   const selectedCategoryName = selectedCategory
@@ -173,10 +187,7 @@ export default function ForumPage() {
               <MyPostsDialog onEditPost={(postId) => setEditPostId(postId)} />
               <CreatePostDialog
                 categories={categories}
-                onPostCreated={() => {
-                  fetchPosts()
-                  fetchCategories()
-                }}
+                onPostCreated={handlePostCreated}
               />
             </div>
           </div>
