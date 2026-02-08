@@ -16,10 +16,7 @@ export default function GavePage() {
             <div className="mx-auto w-full max-w-4xl space-y-8">
               
               {/* Hero Header */}
-              <div className="text-center space-y-4 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-4 mb-4">
-                  <Heart className="h-12 w-12 text-primary animate-pulse" />
-                </div>
+              <div className="text-center space-y-4 animate-in pt-4 fade-in slide-in-from-bottom-4 duration-700">
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                   Støtt Nautix
                 </h1>
@@ -29,7 +26,7 @@ export default function GavePage() {
               </div>
 
               {/* Main Content Card */}
-              <Card className="border-2 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+              <Card className="border-2 overflow-hidden p-0 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
                 <CardContent className="p-0">
                   
                   {/* Profile Section with Modern Layout */}
