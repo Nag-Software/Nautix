@@ -70,39 +70,8 @@ export function AIInputWrapper({
     }
   }
 
-  // Check for autofill suggestions when trigger fields change
-  useEffect(() => {
-    if (enableAutofill && triggerFields) {
-      const manufacturer = triggerFields.manufacturer
-      const model = triggerFields.model
-
-      if (manufacturer && model && manufacturer.length > 1 && model.length > 1) {
-        // Check how many affected fields are already filled
-        const affectedFields = autofillType === 'boat' 
-          ? ['length_meters', 'width_meters', 'weight_kg', 'hull_material', 'year']
-          : ['horsepower', 'year', 'engine_type', 'fuel_type', 'fuel_consumption_lph', 'oil_type']
-        
-        const filledFieldsCount = affectedFields.filter(field => {
-          const fieldValue = currentData[field]
-          return fieldValue && fieldValue.trim() !== ''
-        }).length
-
-        // Don't run autofill if 2 or more fields are already filled
-        if (filledFieldsCount >= 2) {
-          return
-        }
-
-        const searchKey = `${manufacturer.toLowerCase()}-${model.toLowerCase()}`
-        
-        // Only search if this is a new combination and we haven't exceeded max iterations
-        if (searchKey !== lastSearchedRef.current && autofillCountRef.current < MAX_AUTOFILL_ITERATIONS) {
-          lastSearchedRef.current = searchKey
-          autofillCountRef.current += 1
-          checkForAutofill(manufacturer, model)
-        }
-      }
-    }
-  }, [enableAutofill, triggerFields, currentData, autofillType])
+  // Autofill is now triggered on input blur (focus out) to avoid excessive
+  // requests while the user is still typing. See `handleBlur` below.
 
   const checkForAutofill = async (manufacturer: string, model: string) => {
     setIsCheckingAutofill(true)
@@ -136,7 +105,42 @@ export function AIInputWrapper({
     if (field) {
       checkForSuggestions(field, e.target.value)
     }
+    // Trigger parent onBlur
     props.onBlur?.(e)
+
+    // Run autofill only when enabled and when this input is one of the trigger fields
+    // (usually `manufacturer` or `model`). This ensures we only call the expensive
+    // autofill API when the user leaves the field (less noisy than per-keystroke).
+    try {
+      if (enableAutofill && triggerFields && (field === 'manufacturer' || field === 'model')) {
+        const manufacturer = triggerFields.manufacturer
+        const model = triggerFields.model
+
+        if (manufacturer && model && manufacturer.length > 1 && model.length > 1) {
+          // Check how many affected fields are already filled
+          const affectedFields = autofillType === 'boat'
+            ? ['length_meters', 'width_meters', 'weight_kg', 'hull_material', 'year']
+            : ['horsepower', 'year', 'engine_type', 'fuel_type', 'fuel_consumption_lph', 'oil_type']
+
+          const filledFieldsCount = affectedFields.filter(f => {
+            const fieldValue = currentData[f]
+            return fieldValue && String(fieldValue).trim() !== ''
+          }).length
+
+          // Don't run autofill if 2 or more fields are already filled
+          if (filledFieldsCount >= 2) return
+
+          const searchKey = `${manufacturer.toLowerCase()}-${model.toLowerCase()}`
+          if (searchKey !== lastSearchedRef.current && autofillCountRef.current < MAX_AUTOFILL_ITERATIONS) {
+            lastSearchedRef.current = searchKey
+            autofillCountRef.current += 1
+            checkForAutofill(manufacturer, model)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error triggering autofill on blur:', err)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
