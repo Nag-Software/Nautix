@@ -179,6 +179,11 @@ export function NotificationsPanel() {
                       className="cursor-pointer flex-col items-start p-3 focus:bg-muted"
                       onSelect={(e) => {
                         e.preventDefault()
+                        
+                        // Optimistically remove from list
+                        setReminders(prev => prev.filter(r => r.id !== reminder.id))
+                        
+                        // Close panel and navigate
                         setOpen(false)
                         router.push("/vedlikehold/paminnelser")
                       }}

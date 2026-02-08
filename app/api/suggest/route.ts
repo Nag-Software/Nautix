@@ -120,6 +120,17 @@ function extractResponseText(response: any): string {
   return typeof text === 'string' ? text.trim() : ''
 }
 
+function cleanJSONResponse(text: string): string {
+  // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+  let cleaned = text.trim()
+  
+  // Match ```json or ``` at the start and ``` at the end
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '')
+  cleaned = cleaned.replace(/\n?```\s*$/i, '')
+  
+  return cleaned.trim()
+}
+
 async function createWebSearchResponse(opts: {
   model: string
   messages: Array<{ role: string; content: string | any[] }>
@@ -290,10 +301,13 @@ EKSEMPLER PÅ SPØRSMÅL OM BRUKERDATA:
 - "Når byttet jeg olje sist?" → Sjekk VEDLIKEHOLDSLOGG etter oljeskift
 - "Hva har jeg gjort med motoren i år?" → Sjekk VEDLIKEHOLDSLOGG (category: motor)
 - "Når skal jeg ha neste vedlikehold?" → Sjekk PÅMINNELSER
-- "Har jeg manualen til min motor?" → Sjekk BRUKERENS DOKUMENTER
+- "Hvilke dokumenter har jeg?" → List opp alle dokumenter fra BRUKERENS DOKUMENTER
+- "Har jeg manualen til min motor?" → Sjekk BRUKERENS DOKUMENTER og svar JA/NEI med detaljer
 - "Hva står i manualen min om X?" → Hvis dokument finnes, referer til det og be brukeren åpne det for detaljer
 - "Hvor mye har jeg brukt på vedlikehold?" → Summer opp cost fra VEDLIKEHOLDSLOGG
 - "Hvilke deler har jeg byttet?" → Sjekk parts_used i VEDLIKEHOLDSLOGG
+
+KRITISK: Når brukeren spør om SINE egne dokumenter/data, svarer du ALLTID basert på data ovenfor. Du skal ALDRI si "jeg har ikke tilgang til" når dataene er inkludert i konteksten.
 
 VIKTIG - DU KAN UTFØRE FØLGENDE HANDLINGER AUTOMATISK:
 1. Legge til vedlikeholdslogg-oppføring
@@ -530,7 +544,7 @@ HANDLINGS-REGLER:
                 
               content.push({
                 type: 'input_image',
-                image: base64Data
+                image_url: `data:image/jpeg;base64,${base64Data}`
               })
             }
             messages.push({
@@ -559,7 +573,7 @@ HANDLINGS-REGLER:
               
             content.push({
               type: 'input_image',
-              image: base64Data
+              image_url: `data:image/jpeg;base64,${base64Data}`
             })
           }
           messages.push({
@@ -576,60 +590,24 @@ HANDLINGS-REGLER:
       // VANLIG SAMTALE
       let responseText = ''
       
-      // Check if any message contains images
-      const hasImages = images && images.length > 0
-      
-      if (hasImages) {
-        // Use Chat Completions API for vision support (no web search with images)
-        const chatMessages = messages.map(msg => {
-          if (typeof msg.content === 'string') {
-            return msg
-          }
-          // Convert to Chat Completions format
-          const content: any[] = []
-          for (const part of msg.content) {
-            if (part.type === 'input_text') {
-              content.push({ type: 'text', text: part.text })
-            } else if (part.type === 'input_image') {
-              content.push({
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/jpeg;base64,${part.image}`
-                }
-              })
-            }
-          }
-          return { role: msg.role, content }
-        })
-        
-        const chatResponse = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: chatMessages as any,
-          temperature: 0.7,
-          max_tokens: 1500,
-        })
-        
-        responseText = chatResponse.choices[0]?.message?.content || ''
-      } else {
-        // Use Responses API with web search for text-only
-        const response = await createWebSearchResponse({
-          model: 'gpt-4.1-mini',
-          messages,
-          temperature: 0.7,
-          maxOutputTokens: 1500,
-          searchContextSize:
-            webSearchContextSize === 'low' ||
-            webSearchContextSize === 'medium' ||
-            webSearchContextSize === 'high'
-              ? webSearchContextSize
-              : 'medium',
-        })
-        responseText = extractResponseText(response)
-      }
+      // Use Responses API for everything (supports both vision and web search)
+      const response = await createWebSearchResponse({
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.7,
+        maxOutputTokens: 1500,
+        searchContextSize:
+          webSearchContextSize === 'low' ||
+          webSearchContextSize === 'medium' ||
+          webSearchContextSize === 'high'
+            ? webSearchContextSize
+            : 'medium',
+      })
+      responseText = extractResponseText(response)
       
       try {
         // Try to parse as JSON
-        const parsedResponse = JSON.parse(responseText || '{}')
+        const parsedResponse = JSON.parse(cleanJSONResponse(responseText || '{}'))
         return NextResponse.json({ 
           suggestion: parsedResponse.response || responseText,
           actions: parsedResponse.actions || []
@@ -646,7 +624,7 @@ HANDLINGS-REGLER:
     // Handle maintenance reminder suggestion
     if (action === 'maintenance_reminder') {
       const response = await createWebSearchResponse({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -692,7 +670,7 @@ Når bør neste vedlikehold/service utføres?`,
 
       if (responseText) {
         try {
-          const suggestion = JSON.parse(responseText)
+          const suggestion = JSON.parse(cleanJSONResponse(responseText))
           return NextResponse.json({ suggestion })
         } catch (parseError) {
           console.error('Error parsing AI response:', parseError)
@@ -711,7 +689,7 @@ Når bør neste vedlikehold/service utføres?`,
       // Handle boat autofill
       if (type === 'boat') {
         const response = await createWebSearchResponse({
-          model: 'gpt-4.1-mini',
+          model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
@@ -740,7 +718,7 @@ Kun returner JSON-objektet, ingen annen tekst.`,
 
         if (responseText) {
           try {
-            const suggestions = JSON.parse(responseText)
+            const suggestions = JSON.parse(cleanJSONResponse(responseText))
             const filteredSuggestions = Object.fromEntries(
               Object.entries(suggestions).filter(([_, v]) => v !== null && v !== 'null' && v !== '')
             )
@@ -758,7 +736,7 @@ Kun returner JSON-objektet, ingen annen tekst.`,
 
       // Handle engine autofill
       const response = await createWebSearchResponse({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -791,7 +769,7 @@ Kun returner JSON-objektet, ingen annen tekst.`,
 
       if (responseText) {
         try {
-          const suggestions = JSON.parse(responseText)
+          const suggestions = JSON.parse(cleanJSONResponse(responseText))
           // Filter out null values
           const filteredSuggestions = Object.fromEntries(
             Object.entries(suggestions).filter(([_, v]) => v !== null && v !== 'null' && v !== '')
@@ -827,7 +805,7 @@ Kun returner JSON-objektet, ingen annen tekst.`,
     }
 
     const response = await createWebSearchResponse({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',

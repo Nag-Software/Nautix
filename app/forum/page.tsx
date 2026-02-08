@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { 
@@ -59,6 +60,7 @@ interface Post {
 }
 
 export default function ForumPage() {
+  const searchParams = useSearchParams()
   const [categories, setCategories] = useState<Category[]>([])
   const [posts, setPosts] = useState<Post[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -66,6 +68,14 @@ export default function ForumPage() {
   const [editPostId, setEditPostId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
+
+  // Handle post query parameter
+  useEffect(() => {
+    const postId = searchParams.get('post')
+    if (postId) {
+      setSelectedPostId(postId)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     fetchCategories()
