@@ -35,24 +35,75 @@ interface ForumNotification {
 export function NotificationsPanel() {
   const [reminders, setReminders] = useState<ReminderNotification[]>([])
   const [forumPosts, setForumPosts] = useState<ForumNotification[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [isMarkingRead, setIsMarkingRead] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
-  const totalCount = reminders.length + forumPosts.reduce((sum, post) => sum + post.unread_comment_count, 0)
+  const totalCount = reminders.length
+    + forumPosts.reduce((sum, post) => sum + post.unread_comment_count, 0)
+    + notifications.filter(n => !n.read).length
+
+  // Realtime: subscribe to new notifications so authors get near-instant updates
+  useEffect(() => {
+    let channel: any
+
+    const setup = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        channel = supabase
+          .channel('public:notifications')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'notifications' },
+            async (payload: any) => {
+              try {
+                const notif = payload?.new
+                if (!notif) return
+                if (notif.user_id === user.id) {
+                  fetchNotifications()
+                }
+              } catch (err) {
+                console.error('Realtime notification handler error:', err)
+              }
+            }
+          )
+          .subscribe()
+      } catch (err) {
+        console.error('Error setting up realtime subscription:', err)
+      }
+    }
+
+    setup()
+
+    return () => {
+      try {
+        if (channel && typeof channel.unsubscribe === 'function') {
+          channel.unsubscribe()
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (open) {
       // Fetch immediately when panel opens
       fetchNotifications()
+      fetchPersistentNotifications()
     }
   }, [open])
 
   useEffect(() => {
     // Initial fetch
     fetchNotifications()
+    fetchPersistentNotifications()
 
     // Refresh every 2 minutes (not too aggressive)
     const interval = setInterval(fetchNotifications, 120000)
@@ -97,6 +148,25 @@ export function NotificationsPanel() {
     } catch (error) {
       console.error("Error fetching notifications:", error)
       setLoading(false)
+    }
+  }
+
+  // Fetch persistent notifications for the user
+  const fetchPersistentNotifications = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: notifs } = await supabase
+        .from('notifications')
+        .select('id,type,post_id,comment_id,post_title,read,created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      setNotifications(notifs || [])
+    } catch (err) {
+      console.error('Error fetching persistent notifications:', err)
     }
   }
 
@@ -217,6 +287,67 @@ export function NotificationsPanel() {
                     </DropdownMenuItem>
                   )
                 })}
+                {notifications.length > 0 && <DropdownMenuSeparator />}
+              </>
+            )}
+
+            {/* Persistent Notifications Section */}
+            {notifications.length > 0 && (
+              <>
+                <div className="px-2 py-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Meldinger
+                  </p>
+                </div>
+                {notifications.map((n) => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    className="cursor-pointer flex-col items-start p-3 focus:bg-muted"
+                    onSelect={async (e) => {
+                      e.preventDefault()
+                      try {
+                        // Mark notification read
+                        await supabase.from('notifications').update({ read: true }).eq('id', n.id)
+                        // Optimistically update
+                        setNotifications(prev => prev.filter(x => x.id !== n.id))
+                        setOpen(false)
+                        // If the notification points to a post, mark it read (update post view) so unread counts update
+                        if (n.post_id) {
+                          try {
+                            await fetch(`/api/forum/posts/${n.post_id}/mark-read`, { method: 'POST' })
+                          } catch (err) {
+                            console.error('Error calling mark-read for notification click:', err)
+                          }
+                        }
+
+                        // Don't navigate to `?post=null` — fall back to forum root when no post_id
+                        const target = n.post_id ? `/forum?post=${n.post_id}${n.comment_id ? `&comment=${n.comment_id}` : ''}` : '/forum'
+                        router.push(target)
+                      } catch (err) {
+                        console.error('Error marking notification read:', err)
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-2 w-full">
+                      <MessageCircle className="h-4 w-4 mt-0.5 shrink-0 text-green-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium line-clamp-1">
+                            {n.post_title || 'Nytt svar'}
+                          </p>
+                          {!n.read && (
+                            <Badge variant="destructive" className="shrink-0 h-5 min-w-5 px-1.5 text-[10px]">
+                              ny
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(n.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
                 {forumPosts.length > 0 && <DropdownMenuSeparator />}
               </>
             )}

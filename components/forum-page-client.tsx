@@ -65,6 +65,7 @@ export default function ForumPageClient() {
   const [posts, setPosts] = useState<Post[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null)
   const [editPostId, setEditPostId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
@@ -72,8 +73,10 @@ export default function ForumPageClient() {
   // Handle post query parameter
   useEffect(() => {
     const postId = searchParams.get('post')
+    const commentId = searchParams.get('comment')
     if (postId) {
       setSelectedPostId(postId)
+      if (commentId) setSelectedCommentId(commentId)
     }
   }, [searchParams])
 
@@ -267,8 +270,9 @@ export default function ForumPageClient() {
         {/* Post Detail Drawer */}
         <ForumPostDrawer
           postId={selectedPostId}
+          commentId={selectedCommentId}
           open={selectedPostId !== null}
-          onClose={() => setSelectedPostId(null)}
+          onClose={() => { setSelectedPostId(null); setSelectedCommentId(null); }}
           onEdit={() => handlePostEdit(selectedPostId!)}
           onDelete={handlePostDelete}
         />

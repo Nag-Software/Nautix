@@ -95,7 +95,9 @@ export async function POST(
       .single()
     
     if (error) throw error
-    
+
+    // Notifications are created via DB trigger `notify_on_comment` to ensure
+    // consistent notification creation regardless of insertion path.
     return NextResponse.json(comment, { status: 201 })
   } catch (error) {
     console.error('Error creating comment:', error)

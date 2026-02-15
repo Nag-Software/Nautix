@@ -59,9 +59,10 @@ interface ForumPostDrawerProps {
   onClose: () => void
   onEdit?: () => void
   onDelete?: () => void
+  commentId?: string | null
 }
 
-export function ForumPostDrawer({ postId, open, onClose, onEdit, onDelete }: ForumPostDrawerProps) {
+export function ForumPostDrawer({ postId, open, onClose, onEdit, onDelete, commentId }: ForumPostDrawerProps) {
   const [post, setPost] = useState<Post | null>(null)
   const [comments, setComments] = useState<ThreadedCommentData[]>([])
   const [newComment, setNewComment] = useState("")
@@ -78,6 +79,8 @@ export function ForumPostDrawer({ postId, open, onClose, onEdit, onDelete }: For
       fetchComments()
       fetchCurrentUser()
     }
+    // clear previous commentId when opening different post
+    // (selected comment handled via prop)
   }, [postId, open])
 
   const fetchCurrentUser = async () => {
@@ -119,6 +122,22 @@ export function ForumPostDrawer({ postId, open, onClose, onEdit, onDelete }: For
       // Build comment tree structure
       const commentTree = buildCommentTree(data)
       setComments(commentTree)
+      // If a specific comment should be shown, scroll to it after render
+      if (commentId) {
+        setTimeout(() => {
+          try {
+            const el = document.getElementById(`comment-${commentId}`)
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              // brief highlight
+              el.classList.add('ring', 'ring-2', 'ring-primary')
+              setTimeout(() => el.classList.remove('ring', 'ring-2', 'ring-primary'), 2500)
+            }
+          } catch (e) {
+            console.error('Error scrolling to comment:', e)
+          }
+        }, 150)
+      }
     } catch (error) {
       console.error("Error fetching comments:", error)
       toast.error("Kunne ikke laste kommentarer")

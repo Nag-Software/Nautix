@@ -89,7 +89,7 @@ export function ThreadedComment({
   const avatarColor = rankColors[commentAuthorStats.rank as keyof typeof rankColors] || 'bg-slate-500'
 
   return (
-    <div className={cn(
+    <div id={`comment-${comment.id}`} className={cn(
       "group relative",
       comment.depth > 0 && "ml-10"
     )}>

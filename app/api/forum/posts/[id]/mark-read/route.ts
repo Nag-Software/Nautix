@@ -27,6 +27,22 @@ export async function POST(
         { status: 500 }
       )
     }
+
+    // Also mark any persistent notifications for this post as read for the current user
+    try {
+      const { error: notifErr } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('post_id', id)
+        .eq('user_id', user.id)
+
+      if (notifErr) {
+        console.error('Error marking notifications read for post:', notifErr)
+        // don't fail the request because of notification update; just log
+      }
+    } catch (e) {
+      console.error('Unexpected error updating notifications:', e)
+    }
     
     return NextResponse.json({ success: true })
   } catch (error) {

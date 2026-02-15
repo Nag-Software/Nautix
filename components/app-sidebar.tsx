@@ -24,6 +24,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationsPanel } from "@/components/notifications-panel"
 import { SupportDialog } from "@/components/support-dialog"
 import { FeedbackDialog } from "@/components/feedback-dialog"
+
 import {
   Sidebar,
   SidebarContent,
@@ -187,15 +188,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </div>
                 </a>
                 */}
-                <a href="/" >
-                  <div className="bg-sidebar-secondary text-sidebar-secondary-foreground flex justify-between items-center w-full">
+                <div className="w-full">
+                  <a href="/" className="block w-full">
+                    <div className="bg-sidebar-secondary text-sidebar-secondary-foreground flex justify-between items-center w-full">
                       <Image src="/trans.png" alt="Nautix Logo" width={110} height={32} className="mr-2 dark:invert" />
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         <NotificationsPanel />
                         <ThemeToggle />
                       </div>
                     </div>
-                </a>
+                  </a>
+                </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -214,3 +217,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </>
   )
 }
+
+// Dev test button removed
