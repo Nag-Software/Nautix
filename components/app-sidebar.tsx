@@ -84,12 +84,14 @@ const data = {
       icon: Folder,
       isActive: true,
     },
+    /*
     {
       title: "Forum",
       url: "/forum",
       icon: MessageSquare,
       isActive: true,
     },
+    */
     {
       title: "Hjelp",
       url: "#",
@@ -133,11 +135,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: "Tilbakemelding",
       icon: Send,
       onClick: () => setFeedbackOpen(true),
-    },
-    {
-      title: "Gi en gave",
-      url: "/gave",
-      icon: Heart,
     },
   ]
 
