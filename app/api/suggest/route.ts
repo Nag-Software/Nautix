@@ -308,11 +308,12 @@ export async function POST(request: Request) {
                   .from('documents')
                   .createSignedUrl(doc.file_path, 60 * 60) // 1 hour
 
-                if (signed && (signed.signedUrl || signed.signed_url || signed.signed_url)) {
-                  // createSignedUrl shape may vary; prefer common property names
-                  const url = signed.signedUrl || signed.signed_url || signed.signedUrl
+                const maybe: any = signed
+                const url = maybe?.signedUrl ?? maybe?.signed_url ?? null
+
+                if (url) {
                   userContext += `  URL: ${url}\n`
-                } else if (signed && signed.signedUrl === undefined && signErr) {
+                } else if (signErr) {
                   // fallback: note that file exists but couldn't create URL
                   userContext += `  Fil lagret i system (ingen URL tilgjengelig)\n`
                 }
