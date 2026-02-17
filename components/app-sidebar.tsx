@@ -136,6 +136,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: Send,
       onClick: () => setFeedbackOpen(true),
     },
+    {
+      title: "Gi en gave",
+      icon: Heart,
+      url: "/gave",
+    }
   ]
 
   useEffect(() => {

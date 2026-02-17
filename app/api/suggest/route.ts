@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
+import { shouldSearchUserDocumentsForPrompt, extractTextFromBuffer, cosineSimilarity } from '@/lib/doc-search'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -107,6 +108,8 @@ function shouldUseWebSearchForPrompt(prompt: string): boolean {
   return false
 }
 
+
+
 function extractResponseText(response: any): string {
   if (typeof response?.output_text === 'string' && response.output_text.trim()) {
     return response.output_text.trim()
@@ -187,6 +190,10 @@ export async function POST(request: Request) {
       const supabase = await createClient()
       const { data: { user } } = await supabase.auth.getUser()
       
+      // uploadedDocuments may be referenced later when performing semantic search;
+      // declare in outer scope so it's available regardless of where we reference it.
+      let uploadedDocuments: any[] | null = null
+
       let userContext = ""
       
       if (user) {
@@ -225,6 +232,15 @@ export async function POST(request: Request) {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(30)
+
+        // Also fetch uploaded documents stored in the documents table
+        const { data: _uploaded } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(30)
+        uploadedDocuments = _uploaded || null
         
         // Build context string
         if (boats && boats.length > 0) {
@@ -277,6 +293,34 @@ export async function POST(request: Request) {
             if (doc.url) userContext += `  URL: ${doc.url}\n`
             if (doc.file_path) userContext += `  Fil lagret i system\n`
           })
+        }
+        
+        // Include uploaded documents with signed URLs when possible
+        if (uploadedDocuments && uploadedDocuments.length > 0) {
+          userContext += "\n**OPPLASTEDE DOKUMENTER (siste 30):**\n"
+          for (const doc of uploadedDocuments) {
+            userContext += `- ${doc.name} (${doc.type || 'ukjent type'})\n`
+            if (doc.upload_date) userContext += `  Lastet opp: ${doc.upload_date}\n`
+            if (doc.expiry_date) userContext += `  Utløper: ${doc.expiry_date}\n`
+            if (doc.file_path) {
+              try {
+                const { data: signed, error: signErr } = await supabase.storage
+                  .from('documents')
+                  .createSignedUrl(doc.file_path, 60 * 60) // 1 hour
+
+                if (signed && (signed.signedUrl || signed.signed_url || signed.signed_url)) {
+                  // createSignedUrl shape may vary; prefer common property names
+                  const url = signed.signedUrl || signed.signed_url || signed.signedUrl
+                  userContext += `  URL: ${url}\n`
+                } else if (signed && signed.signedUrl === undefined && signErr) {
+                  // fallback: note that file exists but couldn't create URL
+                  userContext += `  Fil lagret i system (ingen URL tilgjengelig)\n`
+                }
+              } catch (e) {
+                userContext += `  Fil lagret i system\n`
+              }
+            }
+          }
         }
       }
 
@@ -590,6 +634,59 @@ HANDLINGS-REGLER:
       // VANLIG SAMTALE
       let responseText = ''
       
+      // If prompt likely targets user's documents, run semantic search over uploaded docs
+      if (shouldSearchUserDocumentsForPrompt(userPrompt)) {
+        const docsWithText: Array<{ id: string; name: string; text: string; score?: number }> = []
+        for (const doc of uploadedDocuments || []) {
+          if (!doc.file_path) continue
+          try {
+            const { data: fileData, error: downloadError } = await supabase.storage
+              .from('documents')
+              .download(doc.file_path)
+
+            if (downloadError || !fileData) continue
+
+            const arrayBuffer = await fileData.arrayBuffer()
+            const text = await extractTextFromBuffer(arrayBuffer, doc.file_path)
+            if (text && text.trim().length > 20) {
+              docsWithText.push({ id: doc.id, name: doc.name, text })
+            }
+          } catch (e) {
+            continue
+          }
+        }
+
+        if (docsWithText.length > 0) {
+          // Build embeddings for user prompt and document texts
+          const embeddingModel = 'text-embedding-3-small'
+          const inputs = [userPrompt, ...docsWithText.map((d) => d.text.slice(0, 8192))]
+          const embResp = await openai.embeddings.create({
+            model: embeddingModel,
+            input: inputs,
+          } as any)
+
+          const userEmb = embResp.data[0].embedding as number[]
+          const docEmbs = embResp.data.slice(1)
+
+          // Score docs
+          for (let i = 0; i < docsWithText.length; i++) {
+            const emb = docEmbs[i].embedding as number[]
+            const score = cosineSimilarity(userEmb, emb)
+            docsWithText[i].score = score
+          }
+
+          docsWithText.sort((a, b) => (b.score || 0) - (a.score || 0))
+          const top = docsWithText.slice(0, 3)
+
+          // Prepend top excerpts to messages for final generation
+          const excerpts = top
+            .map((d) => `Fra dokument: ${d.name}\n---\n${d.text.slice(0, 800)}\n---\n`)
+            .join('\n')
+
+          messages.unshift({ role: 'system', content: `Søk i brukerens dokumenter - relevante utdrag følger:\n\n${excerpts}` })
+        }
+      }
+
       // Use Responses API for everything (supports both vision and web search)
       const response = await createWebSearchResponse({
         model: 'gpt-4o-mini',

@@ -58,7 +58,7 @@ export default function GavePage() {
                       </div>
                       
                       <p className="text-base leading-relaxed">
-                        Jeg bor i seilbåt til daglig, og Nautix er født ut av egne behov og 
+                        Jeg bor i seilbåt til daglig, og Nautix er skapt ut av egne behov og 
                         erfaringer med båtvedlikehold og den praktiske hverdagen på sjøen.
                       </p>
                       
@@ -89,9 +89,9 @@ export default function GavePage() {
                         <Coffee className="h-6 w-6 text-primary" />
                       </div>
                       <div className="space-y-3">
-                        <h3 className="text-lg font-semibold">Din gave betyr alt</h3>
+                        <h3 className="text-lg font-semibold">Din gave betyr mye</h3>
                         <p className="text-muted-foreground leading-relaxed">
-                          Hver krone går direkte til å holde Nautix flytende og gjøre den bedre 
+                          Hver krone går direkte til å holde Nautix gående og gjøre den bedre 
                           for alle båteiere. Du bidrar ikke bare økonomisk – du viser at dette 
                           prosjektet har verdi og gir meg motivasjon til å fortsette utviklingen.
                         </p>
@@ -104,10 +104,10 @@ export default function GavePage() {
                     <div className="space-y-2">
                       <h3 className="text-2xl font-bold">Gi via Vipps</h3>
                       <p className="text-muted-foreground">
-                        Skann QR-koden med Vipps-appen din
+                        Skann QR-koden med Vipps-appen din, eller bruk koden.
                       </p>
                     </div>
-                    
+                    <h1 className="text-2xl font-mono">Vippsnr: #40833</h1>
                     <div className="flex justify-center py-4">
                       <div className="relative rounded-2xl border-2 border-primary/20 bg-white p-6 shadow-xl hover:shadow-2xl transition-shadow">
                         <Image
@@ -133,7 +133,7 @@ export default function GavePage() {
                       Tusen takk for at du er med på denne reisen! ⛵
                     </p>
                     <p className="text-muted-foreground max-w-xl mx-auto">
-                      Sammen holder vi Nautix flytende og gjør båtlivet enklere for alle.
+                      Sammen holder vi Nautix gående og gjør båtlivet enklere for alle.
                     </p>
                     <p className="text-sm font-medium pt-4">
                       – Casper Nag

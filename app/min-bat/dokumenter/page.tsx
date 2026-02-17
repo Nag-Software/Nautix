@@ -736,7 +736,7 @@ export default function DokumenterPage() {
 
         {/* Document Viewer Dialog */}
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-          <DialogContent className="max-w-5xl h-auto">
+          <DialogContent className="max-w-5xl h-auto max-h-[95vh]">
             <DialogHeader>
               <DialogTitle>{viewingDocument?.name}</DialogTitle>
               <DialogDescription>

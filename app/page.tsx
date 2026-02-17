@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { LinkifiedText } from "@/components/linkified-text"
 import { useSearchParams } from "next/navigation"
+import UpgradeModal from "@/components/upgrade-modal";
 
 interface Message {
   id: string
