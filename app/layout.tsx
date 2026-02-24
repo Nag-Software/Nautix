@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConversationProvider } from "@/contexts/conversation-context";
+import { SubscriptionProvider } from '@/contexts/subscription-context'
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
 
@@ -58,7 +59,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
+      <body suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider
@@ -67,9 +68,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConversationProvider>
-            {children}
-          </ConversationProvider>
+          <SubscriptionProvider>
+            <ConversationProvider>
+              {children}
+            </ConversationProvider>
+          </SubscriptionProvider>
           <Toaster richColors position="top-right" duration={15000} />
         </ThemeProvider>
         <Analytics />

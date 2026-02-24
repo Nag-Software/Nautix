@@ -34,7 +34,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { title } from "process"
 
 const data = {
   navMain: [
@@ -135,11 +134,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       title: "Tilbakemelding",
       icon: Send,
       onClick: () => setFeedbackOpen(true),
-    },
-    {
-      title: "Gi en gave",
-      icon: Heart,
-      url: "/gave",
     }
   ]
 
@@ -193,7 +187,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <div className="w-full">
                   <a href="/" className="block w-full">
                     <div className="bg-sidebar-secondary text-sidebar-secondary-foreground flex justify-between items-center w-full">
-                      <Image src="/trans.png" alt="Nautix Logo" width={110} height={32} className="mr-2 dark:invert" />
+                      <Image
+                        src="/trans.png"
+                        alt="Nautix Logo"
+                        width={90}
+                        height={30}
+                        loading="eager"
+                        style={{ width: 'auto', height: 'auto' }}
+                        className="mr-2 dark:invert"
+                      />
                       <div className="flex items-center gap-2">
                         <NotificationsPanel />
                         <ThemeToggle />

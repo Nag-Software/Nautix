@@ -24,6 +24,7 @@ import { toast } from "sonner"
 import { LinkifiedText } from "@/components/linkified-text"
 import { useSearchParams } from "next/navigation"
 import UpgradeModal from "@/components/upgrade-modal";
+import { BillingSheet } from "@/components/billing-sheet"
 
 interface Message {
   id: string
@@ -65,6 +66,21 @@ function PageContent() {
   const [loadingConversation, setLoadingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const loadedConversationRef = useRef<string | null>(null)
+  const [billingOpen, setBillingOpen] = useState(false)
+  const searchParams = useSearchParams()
+
+  // If URL contains ?open_sub=true, open the subscription/pricing drawer
+  useEffect(() => {
+    try {
+      const openSub = searchParams.get('open_sub')
+      if (openSub === 'true') {
+        window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+        setBillingOpen(true)
+      }
+    } catch (e) {
+      // noop
+    }
+  }, [searchParams])
 
   const loadConversation = async (convId: string) => {
     if (convId === conversationId || convId === loadedConversationRef.current) {
@@ -136,7 +152,44 @@ function PageContent() {
     }
 
     try {
+      // Use central /api/usage endpoint to get counts and limits
+      const getUsageAndLimits = async () => {
+        try {
+          const res = await fetch('/api/usage')
+          const json = await res.json()
+          if (!res.ok) throw new Error(json.error || 'Failed to fetch usage')
+          return json
+        } catch (e) {
+          console.warn('Failed to fetch /api/usage, falling back to zero limits', e)
+          return { chatsUsed: 0, chatsLimit: 0, logsUsed: 0, logsLimit: 0, docsUsed: 0, docsLimit: 0 }
+        }
+      }
       if (action.type === "add_maintenance") {
+        // Check quota early and block before showing confirmation toast
+        try {
+          const usageEarly = await getUsageAndLimits()
+          if (usageEarly.logsLimit > 0 && usageEarly.logsUsed >= usageEarly.logsLimit) {
+            // Notify user via toast and signal quota block to caller
+            toast('Grense for vedlikeholdslogger nådd', {
+              description: 'Du har nådd grensen for vedlikeholdslogger på din plan.',
+              action: {
+                label: 'Oppgrader',
+                onClick: () => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+                    setBillingOpen(true)
+                  }
+                }
+              },
+              cancel: { label: 'Lukk', onClick: () => {} },
+              duration: 10000,
+            })
+            return 'quota_logs'
+          }
+        } catch (e) {
+          console.warn('Quota check failed, proceeding to confirmation toast', e)
+        }
+
         // Show confirmation toast before adding to maintenance log
         toast(action.confirmationMessage || "Legg til i vedlikeholdsloggen?", {
           description: `${action.data.title || 'Vedlikeholdsoppgave'} - ${action.data.category || 'Annet'}`,
@@ -145,6 +198,25 @@ function PageContent() {
             label: "Legg til",
             onClick: async () => {
               try {
+                const usage = await getUsageAndLimits()
+                if (usage.logsLimit > 0 && usage.logsUsed >= usage.logsLimit) {
+                  toast('Grense for vedlikeholdslogger nådd', {
+                    description: 'Du har nådd grensen for vedlikeholdslogger på din plan.',
+                    action: {
+                      label: 'Oppgrader',
+                      onClick: () => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+                          setBillingOpen(true)
+                        }
+                      }
+                    },
+                    cancel: { label: 'Lukk', onClick: () => {} },
+                    duration: 10000,
+                  })
+                  return
+                }
+
                 const { error } = await supabase
                   .from("maintenance_log")
                   .insert([{
@@ -169,7 +241,7 @@ function PageContent() {
             onClick: () => {},
           },
         })
-        return true
+        return 'ok'
       } 
       else if (action.type === "add_reminder") {
         // Show confirmation toast before adding reminder
@@ -216,7 +288,7 @@ function PageContent() {
             onClick: () => {},
           },
         })
-        return true
+        return 'ok'
       }
       else if (action.type === "suggest_document") {
         const url = action.data?.url ? String(action.data.url) : ""
@@ -272,43 +344,63 @@ function PageContent() {
             action: {
               label: "Legg til",
               onClick: async () => {
-                try {
-                  const { data: boats } = await supabase
-                    .from("boats")
-                    .select("id")
-                    .eq("user_id", user.id)
-                    .limit(1)
+                  try {
+                    // Check docs quota before inserting link
+                    const usage = await getUsageAndLimits()
+                    if (usage.docsLimit > 0 && usage.docsUsed >= usage.docsLimit) {
+                      toast('Grense for dokumenter nådd', {
+                        description: 'Du har nådd grensen for lagrede dokumenter/lenker på din plan.',
+                        action: {
+                          label: 'Oppgrader',
+                          onClick: () => {
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+                              setBillingOpen(true)
+                            }
+                          }
+                        },
+                        cancel: { label: 'Lukk', onClick: () => {} },
+                        duration: 10000,
+                      })
+                      return
+                    }
 
-                  const boatId = boats?.[0]?.id ?? null
+                    const { data: boats } = await supabase
+                      .from("boats")
+                      .select("id")
+                      .eq("user_id", user.id)
+                      .limit(1)
 
-                  const { error } = await supabase
-                    .from("document_links")
-                    .insert([
-                      {
-                        user_id: user.id,
-                        boat_id: boatId,
-                        title,
-                        url,
-                        type,
-                        description,
-                        source: "ai",
-                      },
-                    ])
+                    const boatId = boats?.[0]?.id ?? null
 
-                  if (error) throw error
+                    const { error } = await supabase
+                      .from("document_links")
+                      .insert([
+                        {
+                          user_id: user.id,
+                          boat_id: boatId,
+                          title,
+                          url,
+                          type,
+                          description,
+                          source: "ai",
+                        },
+                      ])
 
-                  toast.success("Lenke lagt til under Dokumenter")
-                } catch (error: any) {
-                  const maybeMissingTable =
-                    error?.code === "42P01" ||
-                    String(error?.message || "").toLowerCase().includes("document_links")
+                    if (error) throw error
 
-                  if (maybeMissingTable) {
-                    toast.error("Database-tabell mangler. Kjør SQL-setup først.")
-                  } else {
-                    toast.error("Kunne ikke legge til lenke")
+                    toast.success("Lenke lagt til under Dokumenter")
+                  } catch (error: any) {
+                    const maybeMissingTable =
+                      error?.code === "42P01" ||
+                      String(error?.message || "").toLowerCase().includes("document_links")
+
+                    if (maybeMissingTable) {
+                      toast.error("Database-tabell mangler. Kjør SQL-setup først.")
+                    } else {
+                      toast.error("Kunne ikke legge til lenke")
+                    }
                   }
-                }
               },
             },
             cancel: {
@@ -317,7 +409,7 @@ function PageContent() {
             },
           })
         }
-        return true
+        return 'ok'
       }
     } catch (error) {
       console.error("Error executing action:", error)
@@ -350,6 +442,37 @@ function PageContent() {
     setIsLoading(true)
 
     try {
+      // compute usage & limits for chats to prevent creating new conversations when over quota
+      const usage = await (async () => {
+        try {
+          const res = await fetch('/api/usage')
+          const json = await res.json()
+          if (!res.ok) throw new Error(json.error || 'Failed to fetch usage')
+          return json
+        } catch (e) {
+          console.warn('Failed to fetch /api/usage for submit check, falling back to zeros', e)
+          return { chatsUsed: 0, chatsLimit: 0 }
+        }
+      })()
+      if (usage.chatsLimit > 0 && usage.chatsUsed >= usage.chatsLimit) {
+        toast('Samtalekvoten er brukt opp', {
+          description: 'Du har nådd samtalekvoten for din plan og kan ikke starte flere samtaler.',
+          action: {
+            label: 'Oppgrader',
+            onClick: () => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+                setBillingOpen(true)
+              }
+            }
+          },
+          cancel: { label: 'Lukk', onClick: () => {} },
+          duration: 10000,
+        })
+        setIsLoading(false)
+        return
+      }
+
       // Ensure a conversation exists
       let activeConversationId = conversationId
       if (!activeConversationId) {
@@ -511,7 +634,10 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
                         action.data.description = `Alternativ kilde (original ikke tilgjengelig): ${alternativeAction.data.description || ''}`
                         toast.success(`✅ Fant aktiv kilde til "${action.data.title}" (forsøk ${attempt}/10)`, { id: retryToast })
                         foundValidUrl = true
-                        await executeAction(action)
+                        const execRes = await executeAction(action)
+                        if (execRes === 'quota_logs') {
+                          throw new Error('quota_logs')
+                        }
                       } else {
                         console.log(`Attempt ${attempt}/10 failed, URL not active:`, alternativeAction.data.url)
                       }
@@ -539,7 +665,10 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
               console.warn("URL validation failed, proceeding anyway:", error)
             }
           }
-          await executeAction(action)
+          const execRes = await executeAction(action)
+          if (execRes === 'quota_logs') {
+            throw new Error('quota_logs')
+          }
         }
       }
       
@@ -562,15 +691,40 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
         .from("conversations")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", activeConversationId!)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Beklager, det oppstod en feil. Prøv igjen senere.",
-        timestamp: new Date()
+      if (error?.message === 'quota_logs') {
+        // Subscription limit reached for maintenance logs
+        const upgradeMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Du har nådd grensen for vedlikeholdslogger på din plan. Vennligst oppgrader abonnementet for å lagre flere vedlikeholdslogger.",
+          timestamp: new Date()
+        }
+        setMessages((prev) => [...prev, upgradeMessage])
+        toast('Oppgrader for å lagre flere vedlikeholdslogger', {
+          description: 'Abonnementet ditt har nådd grensen for vedlikeholdslogger. Oppgrader for å fortsette å lagre oppføringer.',
+          action: {
+            label: 'Oppgrader',
+            onClick: () => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+                setBillingOpen(true)
+              }
+            }
+          },
+          cancel: { label: 'Lukk', onClick: () => {} },
+          duration: 15000,
+        })
+      } else {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Beklager, det oppstod en feil. Prøv igjen senere.",
+          timestamp: new Date()
+        }
+        setMessages((prev) => [...prev, errorMessage])
       }
-      setMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
@@ -710,6 +864,7 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
           )}
         </main>
       </SidebarInset>
+      <BillingSheet open={billingOpen} onOpenChange={setBillingOpen} />
     </SidebarProvider>
     </>
   )

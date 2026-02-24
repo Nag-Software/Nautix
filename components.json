@@ -20,6 +20,7 @@
     "hooks": "@/hooks"
   },
   "registries": {
-    "@blocks": "https://blocks.so/r/{name}.json"
+    "@blocks": "https://blocks.so/r/{name}.json",
+    "@billingsdk": "https://billingsdk.com/r/{name}.json"
   }
 }

@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/sidebar"
 import { IconLivePhoto } from "@tabler/icons-react"
 import { LinkifiedText } from "@/components/linkified-text"
+import SubscriptionBanner from '@/components/subscription-banner'
 
 interface Conversation {
   id: string
@@ -216,7 +217,7 @@ export default function SamtalerPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Samtaler</h1>
-              <p className="text-muted-foreground">Administrer dine samtaler med AI04</p>
+              <p className="text-muted-foreground">Administrer dine samtaler med Nautix</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -232,6 +233,11 @@ export default function SamtalerPage() {
                 Ny samtale
               </Button>
             </div>
+          </div>
+
+          {/* Subscription / trial banner */}
+          <div>
+            <SubscriptionBanner />
           </div>
 
           {loading ? (
@@ -363,6 +369,7 @@ export default function SamtalerPage() {
                               <Archive className="mr-2 h-4 w-4" />
                               {showArchived ? 'Gjenopprett' : 'Arkiver'}
                             </DropdownMenuItem>
+                            {/*
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={(e) => { e.stopPropagation(); handleDelete(conversation.id) }}
@@ -371,6 +378,7 @@ export default function SamtalerPage() {
                               <Trash2 className="mr-2 h-4 w-4" />
                               Slett
                             </DropdownMenuItem>
+                            */}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

@@ -47,6 +47,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+      // Require active subscription or trial
+      try {
+        const usageRes = await fetch('/api/usage')
+        const usageJson = await usageRes.json()
+        if (!usageJson?.access) {
+          return NextResponse.json({ error: 'Subscription required' }, { status: 403 })
+        }
+        // server-side docs quota check using usage limits
+        const docsCount = await supabase.from('documents').select('id', { count: 'exact' }).eq('user_id', user.id)
+        const docsUsed = Number(docsCount.count ?? 0)
+        const dLimit = Number(usageJson?.docsLimit ?? 0)
+        if (dLimit > 0 && docsUsed >= dLimit) {
+          return NextResponse.json({ error: 'Document quota reached' }, { status: 403 })
+        }
+      } catch (e) {
+        return NextResponse.json({ error: 'Subscription check failed' }, { status: 500 })
+      }
+
     // Download the file
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout

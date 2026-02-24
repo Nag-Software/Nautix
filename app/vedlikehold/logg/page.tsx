@@ -6,6 +6,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { MaintenanceLogTable } from "@/components/maintenance-log-table";
 import { MaintenanceLogDialog } from "@/components/maintenance-log-dialog";
+import SubscriptionBanner from '@/components/subscription-banner'
 
 export default function Page() {
     return (
@@ -45,6 +46,11 @@ export default function Page() {
                                 </p>
                             </div>
                             <MaintenanceLogDialog />
+                        </div>
+
+                        {/* Subscription / trial banner */}
+                        <div>
+                            <SubscriptionBanner />
                         </div>
                         <MaintenanceLogTable />
                     </div>

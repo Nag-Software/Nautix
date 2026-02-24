@@ -31,6 +31,7 @@ import {
 import { Anchor, Plus, Compass, CheckCircle2, AlertCircle, Loader2, Pencil, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
+import { BillingSheet } from '@/components/billing-sheet'
 
 interface Equipment {
   id?: string
@@ -56,6 +57,8 @@ export default function UtstyrPage() {
     notes: "",
   })
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [billingOpen, setBillingOpen] = useState(false)
 
   useEffect(() => {
     loadEquipment()
@@ -80,6 +83,39 @@ export default function UtstyrPage() {
 
       if (!boat) {
         setMessage({ type: "error", text: "Du må først registrere båtinformasjon" })
+        setLoading(false)
+        return
+      }
+
+      // Check subscription / plan access
+      try {
+        const subRes = await fetch('/api/stripe/subscription')
+        const subJson = await subRes.json()
+        const subscription = subJson?.subscription ?? null
+
+        // No active subscription -> deny
+        if (!subscription || !subscription.planId || (String(subscription.status || '').toLowerCase() === 'canceled')) {
+          setHasAccess(false)
+          setMessage({ type: 'error', text: 'Du må ha abonnement for å bruke Utstyrslisten' })
+          setLoading(false)
+          return
+        }
+
+        const pid = String(subscription.planId || '').toLowerCase()
+        // Require maskinist or kaptein
+        if (!(pid.includes('maskinist') || pid.includes('kaptein'))) {
+          setHasAccess(false)
+          setMessage({ type: 'error', text: 'Denne funksjonen krever Maskinist- eller Kaptein-abonnement' })
+          setLoading(false)
+          return
+        }
+
+        setHasAccess(true)
+      } catch (e) {
+        console.error('Failed to verify subscription', e)
+        // Be conservative: deny access if verification fails
+        setHasAccess(false)
+        setMessage({ type: 'error', text: 'Kunne ikke verifisere abonnement. Prøv igjen senere.' })
         setLoading(false)
         return
       }
@@ -292,10 +328,16 @@ export default function UtstyrPage() {
                   </p>
                 </div>
               </div>
-              <Button onClick={handleAdd}>
-                <Plus className="mr-2 h-4 w-4" />
-                Legg til utstyr
-              </Button>
+              {hasAccess ? (
+                <Button onClick={handleAdd}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Legg til utstyr
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={() => setBillingOpen(true)}>
+                  Oppgrader for å bruke
+                </Button>
+              )}
             </div>
 
             {message && (
@@ -309,7 +351,8 @@ export default function UtstyrPage() {
             )}
 
             {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
+            {hasAccess !== false && (
+              <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-lg border p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -337,10 +380,12 @@ export default function UtstyrPage() {
                   {equipment.filter(e => e.status === "expired").length}
                 </div>
               </div>
-            </div>
+              </div>
+            )}
 
             {/* Equipment List */}
-            <div className="space-y-3">
+            {hasAccess !== false && (
+              <div className="space-y-3">
               <h2 className="text-lg font-semibold">Utstyrsliste</h2>
               {equipment.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -384,9 +429,12 @@ export default function UtstyrPage() {
                   )
                 })
               )}
-            </div>
+              </div>
+            )}
           </div>
         </main>
+
+        <BillingSheet open={billingOpen} onOpenChange={setBillingOpen} />
 
         {/* Add/Edit Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>

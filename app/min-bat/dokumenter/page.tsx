@@ -52,6 +52,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { LinkifiedText } from "@/components/linkified-text"
+import SubscriptionBanner from '@/components/subscription-banner'
 
 interface Document {
   id: string
@@ -207,6 +208,41 @@ export default function DokumenterPage() {
         return
       }
 
+      // Check docs quota before uploading
+      try {
+        const docsRes = await supabase.from('documents').select('id', { count: 'exact' }).eq('user_id', user.id)
+        const docsUsed = Number(docsRes.count ?? 0)
+        let dLimit = 0
+        try {
+          const subRes = await fetch('/api/stripe/subscription')
+          const subJson = await subRes.json()
+          const pid = String(subJson?.subscription?.planId || '').toLowerCase()
+          if (pid.includes('matros')) dLimit = 15
+          else if (pid.includes('maskinist')) dLimit = 30
+          else dLimit = 0
+        } catch (e) {
+          dLimit = 0
+        }
+
+        if (dLimit > 0 && docsUsed >= dLimit) {
+          toast('Grense for dokumenter nådd', {
+            description: 'Du har nådd grensen for lagrede dokumenter på din plan.',
+            action: {
+              label: 'Oppgrader',
+              onClick: () => {
+                if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('open-pricing-dialog', { detail: {} }))
+              }
+            },
+            cancel: { label: 'Lukk', onClick: () => {} },
+            duration: 10000,
+          })
+          setUploading(false)
+          return
+        }
+      } catch (e) {
+        // ignore and continue upload attempt
+      }
+
       // Get or create boat
       let { data: boats } = await supabase
         .from("boats")
@@ -233,27 +269,23 @@ export default function DokumenterPage() {
       const fileExt = selectedFile.name.split(".").pop()
       const fileName = `${user.id}/${Date.now()}.${fileExt}`
       
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(fileName, selectedFile)
+      // Send file + metadata to server-side upload endpoint (enforces quota)
+      const fd = new FormData()
+      fd.append('file', selectedFile)
+      fd.append('boat_id', boatId)
+      fd.append('name', formData.name)
+      fd.append('type', formData.type)
+      if (formData.expiry_date) fd.append('expiry_date', formData.expiry_date.toISOString())
 
-      if (uploadError) throw uploadError
+      const metaRes = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: fd,
+      })
 
-      // Save document metadata to database
-      const { error: dbError } = await supabase
-        .from("documents")
-        .insert([{
-          boat_id: boatId,
-          user_id: user.id,
-          name: formData.name,
-          type: formData.type,
-          file_path: fileName,
-          file_size: selectedFile.size,
-          expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null,
-          status: "valid",
-        }])
-
-      if (dbError) throw dbError
+      if (!metaRes.ok) {
+        const errJson = await metaRes.json().catch(() => ({}))
+        throw new Error(errJson?.error || 'Failed to upload')
+      }
 
       toast.success("Dokument lastet opp")
       setUploadDialogOpen(false)
@@ -262,7 +294,7 @@ export default function DokumenterPage() {
       fetchDocuments()
     } catch (error) {
       console.error("Error uploading document:", error)
-      toast.error("Kunne ikke laste opp dokument")
+      toast.error("Ditt abonnement tillater ikke flere dokumenter. Vennligst oppgrader for å laste opp flere.")
     } finally {
       setUploading(false)
     }
@@ -457,6 +489,11 @@ export default function DokumenterPage() {
                 <Upload className="mr-2 h-4 w-4" />
                 Last opp dokument
               </Button>
+            </div>
+
+            {/* Subscription / trial banner */}
+            <div>
+              <SubscriptionBanner />
             </div>
 
             {/* Stats */}

@@ -146,7 +146,7 @@ export function MaintenanceLogDialog({ onSuccess, editData, open: controlledOpen
       }
     } catch (error) {
       console.error("Error saving maintenance log:", error)
-      toast.error("Kunne ikke lagre oppføringen")
+      toast.error("Kunne ikke lagre oppføringen. Du må oppdatere abonnementet ditt.")
     } finally {
       setLoading(false)
     }
