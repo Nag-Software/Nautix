@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSubscriptionForCustomer } from '@/lib/stripe'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -31,6 +32,51 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Allow API routes to proceed without page-redirects so API handlers
+  // can return proper JSON responses (e.g. /api/stripe/checkout).
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    return supabaseResponse
+  }
+
+  // Determine subscription/access status for signed-in users
+  let hasAccess = false
+  if (user) {
+    try {
+      // Use stored stripe_customer_id and derive plan & access directly from Stripe
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('stripe_customer_id')
+        .eq('id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      const customerId = (profile as any)?.stripe_customer_id ?? null
+
+      // Debug: log profile info
+      // eslint-disable-next-line no-console
+      console.log('[middleware] profile fetched', { userId: user.id, customerId })
+
+      if (customerId) {
+        try {
+          const subInfo = await getSubscriptionForCustomer(customerId)
+          // eslint-disable-next-line no-console
+          console.log('[middleware] subscription info', { userId: user.id, status: subInfo.status, planId: subInfo.planId })
+          if (subInfo.status === 'active' || subInfo.status === 'trialing') {
+            hasAccess = true
+          }
+        } catch (e) {
+          // If stripe check fails, be conservative and leave hasAccess as false
+          // eslint-disable-next-line no-console
+          console.error('[middleware] stripe check failed for user', user.id, e)
+        }
+      }
+    } catch (e) {
+      // ignore and treat as no access
+      // eslint-disable-next-line no-console
+      console.error('[middleware] error fetching profile for user', user.id, e)
+    }
+  }
+
   // Update last_seen_at for authenticated users
   if (user) {
     try {
@@ -40,11 +86,26 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // If user is not signed in and the current path is not /login or /signup, redirect to /login
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/signup')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  // If user is not signed in, allow access to public pages (login, signup, reset-password)
+  if (!user) {
+    const publicPaths = ['/login', '/signup', '/reset-password']
+    const isPublic = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p))
+    if (!isPublic) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // If user is signed in but has no subscription/access, redirect to /nosub
+  if (user && !hasAccess) {
+    const allowedFromNoSub = ['/nosub', '/login', '/signup', '/reset-password']
+    const isAllowed = allowedFromNoSub.some((p) => request.nextUrl.pathname.startsWith(p))
+    if (!isAllowed) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/nosub'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Check admin access for /sjefen route
@@ -64,8 +125,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // If user is signed in and trying to access /login or /signup, redirect to home
-  if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
+  // If user is signed in and has access, prevent visiting auth pages
+  if (user && hasAccess && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

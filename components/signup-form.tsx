@@ -87,12 +87,13 @@ export function SignupForm({
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Opprett konto</CardTitle>
-          <CardDescription>Opprett konto med Apple eller Google eller bruk e-post</CardDescription>
+          <CardDescription>Opprett konto med Google eller bruk e-post</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>
             <FieldGroup>
               <Field>
+                {/*
                 <Button variant="outline" type="button" onClick={() => handleOAuth("apple")}>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path
@@ -102,6 +103,7 @@ export function SignupForm({
                   </svg>
                   Lag bruker med Apple
                 </Button>
+                */}
                 <Button variant="outline" type="button" onClick={() => handleOAuth("google")}>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path

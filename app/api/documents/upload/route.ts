@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeLimits } from '../../../../lib/usage'
+import { getSubscriptionForCustomer } from '@/lib/stripe'
 
 export async function POST(req: Request) {
   try {
@@ -32,11 +33,15 @@ export async function POST(req: Request) {
     const docsRes = await supabase.from('documents').select('id', { count: 'exact' }).eq('user_id', user.id)
     const docsUsed = Number(docsRes.count ?? 0)
 
-    // Determine plan from user_profiles (server-side only)
+    // Determine plan by looking up Stripe subscription via stored customer id
     let plan: string | null = null
     try {
-      const { data: profile } = await supabase.from('user_profiles').select('plan').eq('id', user.id).limit(1).single()
-      plan = profile?.plan ?? null
+      const { data: profileRow } = await supabase.from('user_profiles').select('stripe_customer_id').eq('id', user.id).limit(1).single()
+      const customerId = profileRow?.stripe_customer_id
+      if (customerId) {
+        const subInfo = await getSubscriptionForCustomer(customerId)
+        plan = subInfo.planId || null
+      }
     } catch (e) {
       plan = null
     }

@@ -42,17 +42,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (loading) return
     // don't redirect from auth or public pages
-    const publicPaths = ['/nosub', '/login', '/signup', '/reset-password', '/api']
+    const publicPaths = ['/nosub', '/login', '/signup', '/reset-password']
     const isPublic = publicPaths.some((p) => pathname?.startsWith(p))
 
     if (hasSubscription === false && !isPublic) {
       router.push('/nosub')
     }
 
-    // If user gains subscription while on /nosub, allow navigation back to root
-    if (hasSubscription === true && pathname === '/nosub') {
-      router.push('/')
-    }
+    // If user gains subscription while on /nosub, do not force navigation.
+    // Leaving navigation choice to the user so /nosub remains reachable.
   }, [hasSubscription, loading, pathname, router])
 
   return (
