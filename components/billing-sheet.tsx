@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { createClient } from '@/lib/supabase/client'
 import {SubscriptionManagement} from '@/components/billingsdk/subscription-management'
 import { plans, type CurrentPlan } from '@/lib/billingsdk-config'
-import { countUserMessages } from '@/lib/usage'
+import { countUserMessages, countUserLogs } from '@/lib/usage'
 import UsageMeterCircle from '@/registry/billingsdk/usage-meter-circle'
 import { PricingTableThree } from './billingsdk/pricing-table-three'
 
@@ -51,21 +51,16 @@ export function BillingSheet({ open, onOpenChange }: BillingSheetProps) {
           return
         }
 
-        // Compute usage counts for the last 30 days using shared helper
+        // Compute usage counts using shared helpers
         try {
           const chatsCount = await countUserMessages(supabase, user.id)
-
-          const logsRes = await supabase
-            .from('maintenance_log')
-            .select('id', { count: 'exact' })
-            .eq('user_id', user.id)
+          const logsCount = await countUserLogs(supabase, user.id)
 
           const docsRes = await supabase
             .from('documents')
             .select('id', { count: 'exact' })
             .eq('user_id', user.id)
 
-          const logsCount = logsRes.count ?? 0
           const docsCount = docsRes.count ?? 0
 
           if (mounted) {

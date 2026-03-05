@@ -3,6 +3,7 @@
 import React from 'react'
 import { PricingTableThree } from './billingsdk/pricing-table-three'
 import { plans } from '@/lib/billingsdk-config'
+import { Button } from './ui/button'
 
 export default function PricingTableThreeNoSub() {
   async function handlePlanSelect(planId: string, interval: 'monthly' | 'yearly') {
@@ -64,7 +65,7 @@ export default function PricingTableThreeNoSub() {
   }
 
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex items-center justify-center flex-col">
       <PricingTableThree
         plans={plans}
         onPlanSelect={handlePlanSelect}
@@ -75,6 +76,9 @@ export default function PricingTableThreeNoSub() {
         footerButtonText="Kontakt oss"
         onFooterButtonClick={() => (window.location.href = '/contact')}
       />
+      <Button variant="outline" className="mt-5" onClick={() => (window.location.href = '/')}>
+        Jeg har allerede et abonnement
+      </Button>
     </div>
   )
 }

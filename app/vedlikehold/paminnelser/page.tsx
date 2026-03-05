@@ -109,7 +109,7 @@ export default function RemindersPage() {
   const [editReminderOpen, setEditReminderOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [updating, setUpdating] = useState(false)
-  const [showArchived, setShowArchived] = useState(false)
+  const [filterView, setFilterView] = useState<'active' | 'overdue' | 'completed' | 'all'>('active')
   const [newReminderData, setNewReminderData] = useState({
     title: "",
     description: "",
@@ -353,10 +353,46 @@ export default function RemindersPage() {
     }
   }
 
+  const getDaysUntilNumber = (dateString: string) => {
+    const today = new Date()
+    const dueDate = new Date(dateString)
+    const diffTime = dueDate.getTime() - today.getTime()
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  const getDaysUntil = (dateString: string) => {
+    const diffDays = getDaysUntilNumber(dateString)
+    
+    if (diffDays < 0) {
+      return `${Math.abs(diffDays)} ${Math.abs(diffDays) === 1 ? 'dag' : 'dager'} siden`
+    } else if (diffDays === 0) {
+      return "I dag"
+    } else if (diffDays === 1) {
+      return "I morgen"
+    } else {
+      return `Om ${diffDays} ${diffDays === 1 ? 'dag' : 'dager'}`
+    }
+  }
+
   const activeReminders = reminders.filter(r => !r.completed && !r.archived)
-  const completedReminders = reminders.filter(r => r.completed)
-  const archivedReminders = reminders.filter(r => r.archived)
-  const displayedReminders = showArchived ? archivedReminders : activeReminders
+  const overdueReminders = activeReminders.filter(r => getDaysUntilNumber(r.due_date) < 0)
+  const completedReminders = reminders.filter(r => r.completed || r.archived)
+  
+  const displayedReminders = (() => {
+    switch (filterView) {
+      case 'active':
+        return activeReminders
+      case 'overdue':
+        return overdueReminders
+      case 'completed':
+        return completedReminders
+      case 'all':
+        return reminders
+      default:
+        return activeReminders
+    }
+  })()
+  
   const highPriorityCount = activeReminders.filter(r => r.priority === "high").length
 
   const getPriorityColor = (priority: string) => {
@@ -450,27 +486,6 @@ export default function RemindersPage() {
     }
   }
 
-  const getDaysUntilNumber = (dateString: string) => {
-    const today = new Date()
-    const dueDate = new Date(dateString)
-    const diffTime = dueDate.getTime() - today.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  }
-
-  const getDaysUntil = (dateString: string) => {
-    const diffDays = getDaysUntilNumber(dateString)
-    
-    if (diffDays < 0) {
-      return `${Math.abs(diffDays)} ${Math.abs(diffDays) === 1 ? 'dag' : 'dager'} siden`
-    } else if (diffDays === 0) {
-      return "I dag"
-    } else if (diffDays === 1) {
-      return "I morgen"
-    } else {
-      return `Om ${diffDays} ${diffDays === 1 ? 'dag' : 'dager'}`
-    }
-  }
-
   const isActionPending = (id: string, type: string) => 
     pendingAction?.id === id && pendingAction.type === type
 
@@ -516,60 +531,115 @@ export default function RemindersPage() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col w-full mx-auto max-w-6xl gap-6 p-4 md:p-6 lg:p-8">
-          <div className="w-full space-y-6">
-            <div className="flex flex-col items-left justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Vedlikeholdspåminnelser</h1>
-                <p className="text-muted-foreground">
+        <main className="flex flex-1 flex-col w-full mx-auto max-w-[1200px] gap-4 md:gap-6 p-4 md:p-6 lg:p-8">
+          <div className="w-full space-y-4 md:space-y-6">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="space-y-1">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vedlikeholdspåminnelser</h1>
+                <p className="text-sm md:text-base text-muted-foreground">
                   Hold oversikt over kommende vedlikehold og viktige oppgaver
                 </p>
               </div>
-              <div className="flex gap-4 w-full">
-                <Button 
-                  variant={showArchived ? "default" : "outline"}
-                  onClick={() => setShowArchived(!showArchived)} 
-                  className="shrink-0"
-                >
-                  <Archive className="mr-2 h-4 w-4" />
-                  {showArchived ? "Vis aktive" : "Vis arkiv"}
-                </Button>
-                <Button onClick={() => setNewReminderOpen(true)} className="shrink-0">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Ny påminnelse
-                </Button>
-              </div>
+              <Button onClick={() => setNewReminderOpen(true)} size="lg" className="w-full lg:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Ny påminnelse
+              </Button>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant={filterView === 'active' ? 'default' : 'outline'}
+                onClick={() => setFilterView('active')}
+                size="sm"
+              >
+                <Bell className="mr-2 h-4 w-4" />
+                Aktive
+                {activeReminders.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 hover:bg-white/30">
+                    {activeReminders.length}
+                  </Badge>
+                )}
+              </Button>
+              <Button 
+                variant={filterView === 'overdue' ? 'default' : 'outline'}
+                onClick={() => setFilterView('overdue')}
+                size="sm"
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Forfalt
+                {overdueReminders.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 hover:bg-white/30">
+                    {overdueReminders.length}
+                  </Badge>
+                )}
+              </Button>
+              <Button 
+                variant={filterView === 'completed' ? 'default' : 'outline'}
+                onClick={() => setFilterView('completed')}
+                size="sm"
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Fullført
+                {completedReminders.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 hover:bg-white/30">
+                    {completedReminders.length}
+                  </Badge>
+                )}
+              </Button>
+              <Button 
+                variant={filterView === 'all' ? 'default' : 'outline'}
+                onClick={() => setFilterView('all')}
+                size="sm"
+              >
+                Alle
+                <Badge variant="secondary" className="ml-2 bg-white/20 hover:bg-white/30">
+                  {reminders.length}
+                </Badge>
+              </Button>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">
-              <div className="rounded-lg border p-3 md:p-4">
-                <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
-                  <Bell className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="truncate">Aktive</span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <div className="rounded-full bg-blue-500/10 p-1.5">
+                    <Bell className="h-3.5 w-3.5 text-blue-500" />
+                  </div>
+                  <span className="font-medium">Aktive</span>
                 </div>
-                <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold">{activeReminders.length}</div>
+                <div className="text-2xl md:text-3xl font-bold">{activeReminders.length}</div>
               </div>
-              <div className="rounded-lg border p-3 md:p-4">
-                <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
-                  <AlertTriangle className="h-3.5 w-3.5 md:h-4 md:w-4 text-red-500" />
-                  <span className="truncate">Høy prio</span>
+              
+              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <div className="rounded-full bg-red-500/10 p-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                  </div>
+                  <span className="font-medium">Forfalt</span>
                 </div>
-                <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-red-600">{highPriorityCount}</div>
+                <div className="text-2xl md:text-3xl font-bold text-red-600">{overdueReminders.length}</div>
               </div>
-              <div className="rounded-lg border p-3 md:p-4">
-                <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
-                  <Archive className="h-3.5 w-3.5 md:h-4 md:w-4 text-gray-600" />
-                  <span className="truncate">Arkiv</span>
+              
+              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <div className="rounded-full bg-orange-500/10 p-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                  </div>
+                  <span className="font-medium">Høy prioritet</span>
                 </div>
-                <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-gray-600">{archivedReminders.length}</div>
+                <div className="text-2xl md:text-3xl font-bold text-orange-600">{highPriorityCount}</div>
               </div>
-              <div className="rounded-lg border p-3 md:p-4">
-                <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="truncate">Totalt</span>
+              
+              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <div className="rounded-full bg-green-500/10 p-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  </div>
+                  <span className="font-medium">Fullført</span>
                 </div>
-                <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold">{reminders.length}</div>
+                <div className="text-2xl md:text-3xl font-bold text-green-600">{completedReminders.length}</div>
               </div>
             </div>
 
@@ -577,56 +647,85 @@ export default function RemindersPage() {
             {displayedReminders.length > 0 ? (
               <>
                 {/* Mobile List */}
-                <div className="md:hidden space-y-2">
+                <div className="md:hidden space-y-3">
                   {displayedReminders.map((reminder) => {
                     const Icon = categoryIcons[reminder.category] || Anchor
+                    const daysUntil = getDaysUntilNumber(reminder.due_date)
+                    const isOverdue = daysUntil < 0
+                    const isSoon = daysUntil >= 0 && daysUntil <= 7
+                    
                     return (
                       <div
                         key={reminder.id}
                         onClick={() => setSelectedReminder(reminder)}
-                        className="rounded-lg border bg-card p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                        className="rounded-xl border bg-card p-4 hover:shadow-md active:scale-[0.98] cursor-pointer transition-all"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="rounded-full bg-primary/10 p-2 shrink-0">
-                              <Icon className="h-4 w-4 text-primary" />
-                            </div>
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <span className={`font-medium text-sm ${
-                                reminder.completed ? 'line-through text-muted-foreground' : ''
-                              }`}>
-                                {reminder.title}
-                              </span>
-                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                {getStatusBadge(reminder)}
-                                {getPriorityBadge(reminder.priority)}
-                                {reminder.ai_suggested && (
-                                  <Badge variant="outline" className="gap-1">
-                                    <Sparkles className="h-3 w-3 text-purple-500" />
-                                    AI
-                                  </Badge>
-                                )}
-                              </div>
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className={`rounded-full p-2.5 ${
+                            reminder.completed 
+                              ? 'bg-green-500/10' 
+                              : isOverdue 
+                                ? 'bg-red-500/10' 
+                                : isSoon 
+                                  ? 'bg-orange-500/10' 
+                                  : 'bg-primary/10'
+                          }`}>
+                            <Icon className={`h-4 w-4 ${
+                              reminder.completed 
+                                ? 'text-green-500' 
+                                : isOverdue 
+                                  ? 'text-red-500' 
+                                  : isSoon 
+                                    ? 'text-orange-500' 
+                                    : 'text-primary'
+                            }`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className={`font-semibold text-base mb-1 ${
+                              reminder.completed ? 'line-through text-muted-foreground' : ''
+                            }`}>
+                              {reminder.title}
+                            </h3>
+                            {reminder.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                {reminder.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {getStatusBadge(reminder)}
+                              {getPriorityBadge(reminder.priority)}
+                              {reminder.ai_suggested && (
+                                <Badge variant="outline" className="gap-1">
+                                  <Sparkles className="h-3 w-3 text-purple-500" />
+                                  AI
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>
-                            {new Date(reminder.due_date).toLocaleDateString('nb-NO', {
-                              day: '2-digit',
-                              month: 'short'
-                            })}
-                          </span>
-                          <span className={`font-medium ${
-                            getDaysUntilNumber(reminder.due_date) < 0 
-                              ? 'text-red-600' 
-                              : getDaysUntilNumber(reminder.due_date) <= 7 
-                                ? 'text-orange-600' 
-                                : ''
-                          }`}>
-                            · {getDaysUntil(reminder.due_date)}
-                          </span>
+                        
+                        <div className="flex items-center justify-between pt-3 border-t">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span className="font-medium">
+                              {new Date(reminder.due_date).toLocaleDateString('nb-NO', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                          {!reminder.completed && (
+                            <span className={`text-sm font-semibold ${
+                              isOverdue 
+                                ? 'text-red-600' 
+                                : isSoon 
+                                  ? 'text-orange-600' 
+                                  : 'text-muted-foreground'
+                            }`}>
+                              {getDaysUntil(reminder.due_date)}
+                            </span>
+                          )}
                         </div>
                       </div>
                     )
@@ -634,190 +733,228 @@ export default function RemindersPage() {
                 </div>
 
                 {/* Desktop Table */}
-                <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent border-b">
-                        <TableHead className="h-12 px-4 font-medium">Påminnelse</TableHead>
-                        <TableHead className="h-12 px-4 font-medium">Kategori</TableHead>
-                        <TableHead className="h-12 px-4 font-medium">Prioritet</TableHead>
-                        <TableHead className="h-12 px-4 font-medium">Forfallsdato</TableHead>
-                        <TableHead className="h-12 px-4 font-medium">Beskrivelse</TableHead>
-                        <TableHead className="h-12 px-4 font-medium text-right">Handlinger</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {displayedReminders.map((reminder) => {
-                        const Icon = categoryIcons[reminder.category] || Anchor
-                        const busy = isReminderBusy(reminder.id)
-                        const completePending = isActionPending(reminder.id, "complete")
-                        const uncompletePending = isActionPending(reminder.id, "uncomplete")
-                        const deletePending = isActionPending(reminder.id, "delete")
-                    
-                        return (
-                          <TableRow 
-                            key={reminder.id} 
-                            className="hover:bg-muted/50 cursor-pointer"
-                            onClick={() => setSelectedReminder(reminder)}
-                          >
-                            <TableCell className="h-16 px-4">
-                              <div className="flex items-center gap-3">
-                                <div className="rounded-full bg-primary/10 p-2">
-                                  <Icon className="h-4 w-4 text-primary" />
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className={`font-medium ${reminder.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                    {reminder.title}
-                                  </span>
-                                  {reminder.ai_suggested && (
-                                    <Badge variant="outline" className="gap-1 w-fit mt-1">
-                                      <Sparkles className="h-3 w-3 text-purple-500" />
-                                      AI
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="h-16 px-4 text-sm text-muted-foreground capitalize">
-                              {reminder.category}
-                            </TableCell>
-                            <TableCell className="h-16 px-4">
-                              {getPriorityBadge(reminder.priority)}
-                            </TableCell>
-                            <TableCell className="h-16 px-4 text-sm">
-                              <div className="flex flex-col gap-1">
-                                <span className="text-muted-foreground">
-                                  {new Date(reminder.due_date).toLocaleDateString('nb-NO', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })}
-                                </span>
-                                <span className={`text-xs font-medium ${
-                                  getDaysUntilNumber(reminder.due_date) < 0 
-                                    ? 'text-red-600' 
-                                    : getDaysUntilNumber(reminder.due_date) <= 7 
-                                      ? 'text-orange-600' 
-                                      : 'text-muted-foreground'
-                                }`}>
-                                  {getDaysUntil(reminder.due_date)}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="h-16 px-4 max-w-[300px] text-sm text-muted-foreground">
-                              {reminder.description ? (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="block cursor-help truncate">
+                <div className="hidden md:block rounded-xl border bg-card overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-b bg-muted/50">
+                          <TableHead className="h-14 px-6 font-semibold">Påminnelse</TableHead>
+                          <TableHead className="h-14 px-6 font-semibold">Kategori</TableHead>
+                          <TableHead className="h-14 px-6 font-semibold">Prioritet</TableHead>
+                          <TableHead className="h-14 px-6 font-semibold">Forfallsdato</TableHead>
+                          <TableHead className="h-14 px-6 font-semibold">Status</TableHead>
+                          <TableHead className="h-14 px-6 font-semibold text-right">Handlinger</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {displayedReminders.map((reminder) => {
+                          const Icon = categoryIcons[reminder.category] || Anchor
+                          const busy = isReminderBusy(reminder.id)
+                          const completePending = isActionPending(reminder.id, "complete")
+                          const uncompletePending = isActionPending(reminder.id, "uncomplete")
+                          const deletePending = isActionPending(reminder.id, "delete")
+                          const daysUntil = getDaysUntilNumber(reminder.due_date)
+                          const isOverdue = daysUntil < 0
+                          const isSoon = daysUntil >= 0 && daysUntil <= 7
+                      
+                          return (
+                            <TableRow 
+                              key={reminder.id} 
+                              className="hover:bg-muted/50 cursor-pointer border-b last:border-0 group"
+                              onClick={() => setSelectedReminder(reminder)}
+                            >
+                              <TableCell className="h-20 px-6 max-w-lg">
+                                <div className="flex items-center gap-4">
+                                  <div className={`rounded-lg p-2.5 ${
+                                    reminder.completed 
+                                      ? 'bg-green-500/10' 
+                                      : isOverdue 
+                                        ? 'bg-red-500/10' 
+                                        : isSoon 
+                                          ? 'bg-orange-500/10' 
+                                          : 'bg-primary/10'
+                                  }`}>
+                                    <Icon className={`h-5 w-5 ${
+                                      reminder.completed 
+                                        ? 'text-green-500' 
+                                        : isOverdue 
+                                          ? 'text-red-500' 
+                                          : isSoon 
+                                            ? 'text-orange-500' 
+                                            : 'text-primary'
+                                    }`} />
+                                  </div>
+                                  <div className="flex flex-col gap-1 min-w-0">
+                                    <span className={`font-semibold ${reminder.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                      {reminder.title}
+                                    </span>
+                                    {reminder.description && (
+                                      <span className="text-sm text-muted-foreground line-clamp-1">
                                         {reminder.description}
                                       </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-md">
-                                      {reminder.description}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ) : (
-                                <span className="text-muted-foreground/50">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="h-16 px-4" onClick={(e) => e.stopPropagation()}>
-                          <TooltipProvider>
-                            <div className="flex items-center gap-1">
-                              {!reminder.completed ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => toggleReminder(reminder.id, reminder.completed)}
-                                      disabled={busy}
-                                    >
-                                      {completePending ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                      ) : (
-                                        <CheckCircle2 className="size-4" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Marker som fullført</TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => toggleReminder(reminder.id, reminder.completed)}
-                                      disabled={busy}
-                                    >
-                                      {uncompletePending ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                      ) : (
-                                        <RotateCcw className="size-4" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Gjenåpne</TooltipContent>
-                                </Tooltip>
-                              )}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:bg-destructive hover:text-white"
-                                    onClick={() => deleteReminder(reminder.id)}
-                                    disabled={busy}
-                                  >
-                                    {deletePending ? (
-                                      <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="size-4" />
                                     )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Slett</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                                    {reminder.ai_suggested && (
+                                      <Badge variant="outline" className="gap-1 w-fit">
+                                        <Sparkles className="h-3 w-3 text-purple-500" />
+                                        AI-generert
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-20 px-6">
+                                <span className="text-sm font-medium text-muted-foreground capitalize">
+                                  {reminder.category}
+                                </span>
+                              </TableCell>
+                              <TableCell className="h-20 px-6">
+                                {getPriorityBadge(reminder.priority)}
+                              </TableCell>
+                              <TableCell className="h-20 px-6">
+                                <div className="flex flex-col gap-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm font-medium">
+                                      {new Date(reminder.due_date).toLocaleDateString('nb-NO', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })}
+                                    </span>
+                                  </div>
+                                  {!reminder.completed && (
+                                    <span className={`text-xs font-semibold ${
+                                      isOverdue 
+                                        ? 'text-red-600' 
+                                        : isSoon 
+                                          ? 'text-orange-600' 
+                                          : 'text-muted-foreground'
+                                    }`}>
+                                      {getDaysUntil(reminder.due_date)}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="h-20 px-6">
+                                {getStatusBadge(reminder)}
+                              </TableCell>
+                              <TableCell className="h-20 px-6" onClick={(e) => e.stopPropagation()}>
+                                <TooltipProvider>
+                                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {!reminder.completed ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 hover:bg-green-500/10 hover:text-green-600 hover:border-green-500/50"
+                                            onClick={() => toggleReminder(reminder.id, reminder.completed)}
+                                            disabled={busy}
+                                          >
+                                            {completePending ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <CheckCircle2 className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Marker som fullført</TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500/50"
+                                            onClick={() => toggleReminder(reminder.id, reminder.completed)}
+                                            disabled={busy}
+                                          >
+                                            {uncompletePending ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <RotateCcw className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Gjenåpne</TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-9 w-9 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
+                                          onClick={() => deleteReminder(reminder.id)}
+                                          disabled={busy}
+                                        >
+                                          {deletePending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                          )}
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Slett</TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                </TooltipProvider>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               </>
-          ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              {showArchived ? (
-                <>
-                  <Archive className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <h3 className="text-lg font-semibold mb-2">Arkivet er tomt</h3>
-                  <p className="text-muted-foreground">
-                    Fullf\u00f8rte p\u00e5minnelser vil vises her.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <h3 className="text-lg font-semibold mb-2">Ingen aktive p\u00e5minnelser</h3>
-                  <p className="text-muted-foreground">
-                    Du har ingen aktive p\u00e5minnelser enn\u00e5. AI-assistenten vil automatisk opprette p\u00e5minnelser n\u00e5r du logger vedlikehold.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
+            ) : (
+              <div className="rounded-xl border border-dashed p-12 text-center bg-muted/20">
+                {filterView === 'completed' ? (
+                  <>
+                    <Archive className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Ingen fullførte påminnelser</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Påminnelser du fullfører vil vises her.
+                    </p>
+                  </>
+                ) : filterView === 'overdue' ? (
+                  <>
+                    <CheckCircle2 className="mx-auto h-16 w-16 text-green-500/50 mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Ingen forfalte påminnelser</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Flott! Du har ingen forfalte påminnelser.
+                    </p>
+                  </>
+                ) : filterView === 'all' ? (
+                  <>
+                    <Bell className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Ingen påminnelser ennå</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                      Kom i gang ved å opprette din første påminnelse, eller la AI-assistenten automatisk opprette påminnelser når du logger vedlikehold.
+                    </p>
+                    <Button onClick={() => setNewReminderOpen(true)} size="lg">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Opprett første påminnelse
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Bell className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Ingen aktive påminnelser</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Du har ingen aktive påminnelser. AI-assistenten vil automatisk opprette påminnelser når du logger vedlikehold.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </SidebarInset>
 
-      {/* Reminder Details Drawer */}
+      {/* Reminder Details Sheet */}
       <Sheet open={!!selectedReminder} onOpenChange={(open) => !open && setSelectedReminder(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selectedReminder && (() => {
@@ -826,25 +963,44 @@ export default function RemindersPage() {
             const completePending = isActionPending(selectedReminder.id, "complete")
             const uncompletePending = isActionPending(selectedReminder.id, "uncomplete")
             const deletePending = isActionPending(selectedReminder.id, "delete")
+            const daysUntil = getDaysUntilNumber(selectedReminder.due_date)
+            const isOverdue = daysUntil < 0
+            const isSoon = daysUntil >= 0 && daysUntil <= 7
             
             return (
               <>
-                <SheetHeader>
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <Icon className="h-5 w-5 text-primary" />
+                <SheetHeader className="pb-6 border-b">
+                  <div className="flex items-start gap-4">
+                    <div className={`rounded-xl p-3 ${
+                      selectedReminder.completed 
+                        ? 'bg-green-500/10' 
+                        : isOverdue 
+                          ? 'bg-red-500/10' 
+                          : isSoon 
+                            ? 'bg-orange-500/10' 
+                            : 'bg-primary/10'
+                    }`}>
+                      <Icon className={`h-6 w-6 ${
+                        selectedReminder.completed 
+                          ? 'text-green-500' 
+                          : isOverdue 
+                            ? 'text-red-500' 
+                            : isSoon 
+                              ? 'text-orange-500' 
+                              : 'text-primary'
+                      }`} />
                     </div>
-                    <div className="flex-1">
-                      <SheetTitle className={`text-left ${selectedReminder.completed ? 'line-through text-muted-foreground' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <SheetTitle className={`text-xl text-left mb-2 ${selectedReminder.completed ? 'line-through text-muted-foreground' : ''}`}>
                         {selectedReminder.title}
                       </SheetTitle>
-                      <SheetDescription className="mt-1.5">
+                      <SheetDescription className="text-left">
                         <div className="flex items-center gap-2 flex-wrap">
                           {getStatusBadge(selectedReminder)}
                           {getPriorityBadge(selectedReminder.priority)}
                           {selectedReminder.ai_suggested && (
-                            <Badge variant="outline" className="gap-1">
-                              <Sparkles className="h-3 w-3 text-purple-500" />
+                            <Badge variant="outline" className="gap-1.5">
+                              <Sparkles className="h-3.5 w-3.5 text-purple-500" />
                               AI-generert
                             </Badge>
                           )}
@@ -854,46 +1010,54 @@ export default function RemindersPage() {
                   </div>
                 </SheetHeader>
 
-                <div className="space-y-4 mt-4 px-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Kategori</h4>
-                    <p className="text-sm text-muted-foreground capitalize">{selectedReminder.category}</p>
+                <div className="space-y-6 py-6 mx-3">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                      <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold mb-1">Forfallsdato</h4>
+                        <p className="text-sm">
+                          {new Date(selectedReminder.due_date).toLocaleDateString('nb-NO', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                        <p className={`text-sm font-semibold mt-1 ${
+                          isOverdue 
+                            ? 'text-red-600' 
+                            : isSoon 
+                              ? 'text-orange-600' 
+                              : 'text-muted-foreground'
+                        }`}>
+                          {getDaysUntil(selectedReminder.due_date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                      <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold mb-1">Kategori</h4>
+                        <p className="text-sm capitalize">{selectedReminder.category}</p>
+                      </div>
+                    </div>
+
+                    {selectedReminder.description && (
+                      <div className="p-4 rounded-lg bg-muted/50">
+                        <h4 className="text-sm font-semibold mb-2">Beskrivelse</h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                          {selectedReminder.description}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Forfallsdato</h4>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        {new Date(selectedReminder.due_date).toLocaleDateString('nb-NO', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </span>
-                      <span className={`text-sm font-medium ${
-                        getDaysUntilNumber(selectedReminder.due_date) < 0 
-                          ? 'text-red-600' 
-                          : getDaysUntilNumber(selectedReminder.due_date) <= 7 
-                            ? 'text-orange-600' 
-                            : 'text-muted-foreground'
-                      }`}>
-                        ({getDaysUntil(selectedReminder.due_date)})
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedReminder.description && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Beskrivelse</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedReminder.description}</p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-2 pt-4 border-t">
+                  <div className="flex flex-col gap-3 pt-4 border-t">
                     <Button
                       variant="outline"
+                      size="lg"
                       onClick={() => {
                         openEditDialog(selectedReminder)
                         setSelectedReminder(null)
@@ -902,56 +1066,58 @@ export default function RemindersPage() {
                     >
                       Rediger påminnelse
                     </Button>
-                    <div className="flex items-center gap-2">
-                    {!selectedReminder.completed ? (
-                      <Button
-                        onClick={() => {
-                          toggleReminder(selectedReminder.id, selectedReminder.completed)
-                          setSelectedReminder(null)
-                        }}
-                        disabled={busy}
-                        className="flex-1"
-                      >
-                        {completePending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                        )}
-                        Marker som fullført
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          toggleReminder(selectedReminder.id, selectedReminder.completed)
-                          setSelectedReminder(null)
-                        }}
-                        disabled={busy}
-                        className="flex-1"
-                      >
-                        {uncompletePending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <RotateCcw className="mr-2 h-4 w-4" />
-                        )}
-                        Gjenåpne
-                      </Button>
-                    )}
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        deleteReminder(selectedReminder.id)
-                        setSelectedReminder(null)
-                      }}
-                      disabled={busy}
-                    >
-                      {deletePending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <div className="flex items-center gap-3">
+                      {!selectedReminder.completed ? (
+                        <Button
+                          size="lg"
+                          onClick={() => {
+                            toggleReminder(selectedReminder.id, selectedReminder.completed)
+                            setSelectedReminder(null)
+                          }}
+                          disabled={busy}
+                          className="flex-1"
+                        >
+                          {completePending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                          )}
+                          Fullfør
+                        </Button>
                       ) : (
-                        <Trash2 className="mr-2 h-4 w-4" />
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => {
+                            toggleReminder(selectedReminder.id, selectedReminder.completed)
+                            setSelectedReminder(null)
+                          }}
+                          disabled={busy}
+                          className="flex-1"
+                        >
+                          {uncompletePending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                          )}
+                          Gjenåpne
+                        </Button>
                       )}
-                      Slett
-                    </Button>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        onClick={() => {
+                          deleteReminder(selectedReminder.id)
+                          setSelectedReminder(null)
+                        }}
+                        disabled={busy}
+                      >
+                        {deletePending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>

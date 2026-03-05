@@ -23,3 +23,13 @@ export async function countUserMessages(supabase: any, userId: string) {
 
   return Number(res.count ?? 0)
 }
+
+export async function countUserLogs(supabase: any, userId: string) {
+  const since = oneMonthIso()
+  const res = await supabase.from('maintenance_log')
+    .select('id', { count: 'exact' })
+    .eq('user_id', userId)
+    .gte('created_at', since)
+
+  return Number(res.count ?? 0)
+}
