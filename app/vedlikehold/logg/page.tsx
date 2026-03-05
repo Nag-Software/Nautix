@@ -12,7 +12,7 @@ export default function Page() {
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset>
+            <SidebarInset className="overflow-x-hidden">
                 <header className="flex h-16 shrink-0 items-center gap-2">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
@@ -36,7 +36,7 @@ export default function Page() {
                     </div>
                 </header>
                 
-                <main className="flex flex-1 flex-col w-full mx-auto max-w-[1200px] gap-6 p-4 md:p-6 lg:p-8">
+                <main className="flex flex-1 flex-col w-full min-w-0 mx-auto max-w-[1200px] gap-6 p-4 md:p-6 lg:p-8 overflow-x-hidden">
                     <div className="w-full space-y-6">
                         <div className="flex items-center justify-between">
                             <div className="">

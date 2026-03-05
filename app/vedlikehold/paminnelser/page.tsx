@@ -531,12 +531,12 @@ export default function RemindersPage() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col w-full mx-auto max-w-[1200px] gap-4 md:gap-6 p-4 md:p-6 lg:p-8">
+        <main className="flex flex-1 flex-col w-full min-w-0 mx-auto max-w-[1200px] gap-4 md:gap-6 p-4 md:p-6 lg:p-8 overflow-x-hidden">
           <div className="w-full space-y-4 md:space-y-6">
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="space-y-1">
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vedlikeholdspåminnelser</h1>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dine Påminnelser</h1>
                 <p className="text-sm md:text-base text-muted-foreground">
                   Hold oversikt over kommende vedlikehold og viktige oppgaver
                 </p>
@@ -598,49 +598,6 @@ export default function RemindersPage() {
                   {reminders.length}
                 </Badge>
               </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <div className="rounded-full bg-blue-500/10 p-1.5">
-                    <Bell className="h-3.5 w-3.5 text-blue-500" />
-                  </div>
-                  <span className="font-medium">Aktive</span>
-                </div>
-                <div className="text-2xl md:text-3xl font-bold">{activeReminders.length}</div>
-              </div>
-              
-              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <div className="rounded-full bg-red-500/10 p-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                  </div>
-                  <span className="font-medium">Forfalt</span>
-                </div>
-                <div className="text-2xl md:text-3xl font-bold text-red-600">{overdueReminders.length}</div>
-              </div>
-              
-              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <div className="rounded-full bg-orange-500/10 p-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
-                  </div>
-                  <span className="font-medium">Høy prioritet</span>
-                </div>
-                <div className="text-2xl md:text-3xl font-bold text-orange-600">{highPriorityCount}</div>
-              </div>
-              
-              <div className="rounded-xl border bg-card p-4 md:p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <div className="rounded-full bg-green-500/10 p-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                  </div>
-                  <span className="font-medium">Fullført</span>
-                </div>
-                <div className="text-2xl md:text-3xl font-bold text-green-600">{completedReminders.length}</div>
-              </div>
             </div>
 
             {/* Reminders List/Table */}

@@ -192,7 +192,7 @@ export function MaintenanceLogTable() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="w-full overflow-x-hidden space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">
         <div className="rounded-lg border p-3 md:p-4">
@@ -202,12 +202,12 @@ export function MaintenanceLogTable() {
           </div>
           <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold">{filteredLogs.length}</div>
         </div>
-        <div className="rounded-lg border p-3 md:p-4">
+        <div className="rounded-lg border p-3 md:p-4 min-w-0">
           <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
-            <DollarSign className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            <DollarSign className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
             <span className="truncate">Total kostnad</span>
           </div>
-          <div className="mt-1 md:mt-2 text-xl md:text-2xl font-bold">{totalCost.toLocaleString('nb-NO')} kr</div>
+          <div className="mt-1 md:mt-2 text-base md:text-2xl font-bold truncate">{totalCost.toLocaleString('nb-NO')} kr</div>
         </div>
         <div className="rounded-lg border p-3 md:p-4">
           <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground">
@@ -268,8 +268,117 @@ export function MaintenanceLogTable() {
         </Select>
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {filteredLogs.length === 0 ? (
+          <div className="rounded-lg border p-8 text-center text-muted-foreground text-sm">
+            {logs.length === 0
+              ? "Ingen oppføringer ennå. Legg til din første vedlikeholdsoppføring!"
+              : "Ingen oppføringer matcher filteret."}
+          </div>
+        ) : (
+          filteredLogs.map((log) => (
+            <div
+              key={log.id}
+              className="rounded-lg border bg-card p-4 space-y-3 cursor-pointer active:bg-muted/50 transition-colors"
+              onClick={() => setSelectedLog(log)}
+            >
+              {/* Top row: title + menu */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-base leading-tight truncate">{log.title}</p>
+                  <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                    {new Date(log.date).toLocaleDateString("nb-NO", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 -mr-1 -mt-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setReminderDialog({ open: true, log })
+                      }}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4 text-purple-500" />
+                      Opprett påminnelse med AI
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditDialog({ open: true, log })
+                      }}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Rediger
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(log.id)
+                      }}
+                      className="text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Slett
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Description preview */}
+              {log.description && (
+                <p className="text-sm text-muted-foreground line-clamp-2 leading-snug">
+                  {log.description}
+                </p>
+              )}
+
+              {/* Badges */}
+              <div className="flex flex-wrap gap-1.5">
+                {getStatusBadge(log.status)}
+                <Badge variant="secondary" className={getCategoryBadgeColor(log.category)}>
+                  {log.category.charAt(0).toUpperCase() + log.category.slice(1)}
+                </Badge>
+                <Badge variant="outline">{getTypeBadge(log.type)}</Badge>
+              </div>
+
+              {/* Bottom row: cost + hours */}
+              <div className="flex items-center gap-4 pt-2 border-t text-sm">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  <span className="font-medium text-foreground">
+                    {log.cost ? `${log.cost.toLocaleString('nb-NO')} kr` : "–"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span className="font-medium text-foreground">
+                    {log.hours_spent ? `${log.hours_spent} t` : "–"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -287,15 +396,15 @@ export function MaintenanceLogTable() {
             {filteredLogs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      {logs.length === 0
-                        ? "Ingen oppføringer ennå. Legg til din første vedlikeholdsoppføring!"
+                  {logs.length === 0
+                    ? "Ingen oppføringer ennå. Legg til din første vedlikeholdsoppføring!"
                     : "Ingen oppføringer matcher filteret."}
                 </TableCell>
               </TableRow>
             ) : (
               filteredLogs.map((log) => (
-                <TableRow 
-                  key={log.id} 
+                <TableRow
+                  key={log.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => setSelectedLog(log)}
                 >
@@ -334,8 +443,8 @@ export function MaintenanceLogTable() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -344,18 +453,13 @@ export function MaintenanceLogTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() =>
-                            setReminderDialog({
-                              open: true,
-                              log,
-                            })
-                          }
+                          onClick={() => setReminderDialog({ open: true, log })}
                         >
                           <Sparkles className="mr-2 h-4 w-4 text-purple-500" />
                           Opprett påminnelse med AI
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation()
                             setEditDialog({ open: true, log })
