@@ -204,7 +204,7 @@ export function CancelSubscriptionDialog({
                   </span>
                 </div>
                 <Badge variant="secondary">
-                  {parseFloat(plan.monthlyPrice) >= 0
+                  {parseFloat(String(plan.monthlyPrice ?? plan.yearlyPrice ?? 0)) >= 0
                     ? `${plan.monthlyPrice} kr /månedlig`
                     : `${plan.yearlyPrice} kr /månedlig`}
                 </Badge>
