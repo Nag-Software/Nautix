@@ -320,7 +320,7 @@ export function PricingTableThree({
                           "text-left",
                         )}
                       >
-                        {parseFloat(plan.yearlyPrice) >= 0 && (
+                        {parseFloat(String(plan.yearlyPrice ?? 0)) >= 0 && (
                           <>{plan.currency}</>
                         )}
                         {plan.yearlyPrice} kr
