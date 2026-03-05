@@ -871,5 +871,9 @@ Søk etter: "${action.data.title}" alternative download sites PDF`
 }
 
 export default function Page() {
-  return <PageContent />
+  return (
+    <Suspense>
+      <PageContent />
+    </Suspense>
+  )
 }

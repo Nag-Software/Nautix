@@ -320,9 +320,6 @@ export function PricingTableThree({
                           "text-left",
                         )}
                       >
-                        {parseFloat(String(plan.yearlyPrice ?? 0)) >= 0 && (
-                          <>{plan.currency}</>
-                        )}
                         {plan.yearlyPrice} kr
                         {calculateDiscount(
                           plan.monthlyPrice,
@@ -353,9 +350,6 @@ export function PricingTableThree({
                           "text-left",
                         )}
                       >
-                        {parseFloat(plan.monthlyPrice) >= 0 && (
-                          <>{plan.currency}</>
-                        )}
                         {plan.monthlyPrice} kr
                       </span>
                       <p className="text-muted-foreground">per måned</p>
@@ -380,7 +374,7 @@ export function PricingTableThree({
                         <div
                           className={cn(
                             featureIconVariants({ variant }),
-                            feat.iconColor || "text-muted-foreground",
+                            "text-muted-foreground",
                           )}
                         >
                           <Check
