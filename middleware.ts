@@ -2,7 +2,18 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSubscriptionForCustomer } from '@/lib/stripe'
 
+// Paths that must be completely skipped by auth middleware.
+// Stripe (and any other server-to-server webhooks) must never hit auth redirects.
+const UNPROTECTED_API_PATHS = [
+  '/api/stripe/webhook',
+]
+
 export async function middleware(request: NextRequest) {
+  // Hard bypass for webhook endpoints — return before ANY Supabase work.
+  if (UNPROTECTED_API_PATHS.some((p) => request.nextUrl.pathname.startsWith(p))) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -99,7 +110,7 @@ export async function middleware(request: NextRequest) {
 
   // If user is signed in but has no subscription/access, redirect to /nosub
   if (user && !hasAccess) {
-    const allowedFromNoSub = ['/nosub', '/login', '/signup', '/reset-password']
+    const allowedFromNoSub = ['/nosub', '/login', '/signup', '/reset-password', '/sjefen']
     const isAllowed = allowedFromNoSub.some((p) => request.nextUrl.pathname.startsWith(p))
     if (!isAllowed) {
       const url = request.nextUrl.clone()
@@ -143,7 +154,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - Stripe webhook (must be publicly reachable, no auth middleware)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/stripe/webhook|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
