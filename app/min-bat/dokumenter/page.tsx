@@ -545,6 +545,16 @@ export default function DokumenterPage() {
                           {new Date(link.created_at).toLocaleDateString("nb-NO")}
                         </span>
                         <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3"
+                        >
+                          <a href={link.url} target="_blank" rel="noreferrer noopener">
+                            Åpne
+                          </a>
+                        </Button>
+                        <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
@@ -625,7 +635,16 @@ export default function DokumenterPage() {
                             )}
                           </div>
                           {/* Actions */}
-                          <div className="flex items-center gap-1 ml-auto sm:ml-0 sm:justify-end" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2 ml-auto sm:ml-0 sm:justify-end" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3"
+                              onClick={() => handleView(doc)}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Åpne
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
