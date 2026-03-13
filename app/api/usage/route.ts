@@ -25,18 +25,31 @@ export async function GET(req: Request) {
     try {
       const { data: profileRow } = await supabase
         .from('user_profiles')
-        .select('stripe_customer_id,stripe_subscription_id')
+        .select('stripe_customer_id,stripe_subscription_id,stripe_price_id,plan')
         .eq('id', user.id)
         .limit(1)
         .single()
 
-      access = Boolean(profileRow?.stripe_subscription_id)
+      access = Boolean(profileRow?.stripe_subscription_id || profileRow?.stripe_price_id || profileRow?.plan)
 
       const customerId = profileRow?.stripe_customer_id
       if (customerId) {
         const subInfo = await getSubscriptionForCustomer(customerId)
-        plan = subInfo.planId || null
-        if (subInfo.status === 'active' || subInfo.status === 'trialing') access = true
+        const isActive = subInfo.status === 'active' || subInfo.status === 'trialing'
+        
+        // Trust Stripe truth over the DB if we fetched it
+        access = isActive
+        plan = isActive ? (subInfo.planId || null) : null
+        
+        // Auto-sync the DB if we found a discrepancy (Optional, but fixes the middleware loop)
+        const dbHadAccess = Boolean(profileRow?.stripe_subscription_id || profileRow?.stripe_price_id || profileRow?.plan)
+        if (isActive !== dbHadAccess) {
+           await supabase.from('user_profiles').update({
+              stripe_subscription_id: isActive ? (subInfo.subscription?.id ?? null) : null,
+              stripe_price_id: isActive ? (subInfo.priceId ?? null) : null,
+              plan: isActive ? (subInfo.planId ?? null) : null,
+           }).eq('id', user.id)
+        }
       }
     } catch (e) {
       plan = null

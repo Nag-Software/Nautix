@@ -45,6 +45,18 @@ export async function POST(req: Request) {
         const subscriptionId = session.subscription as string
         const metadata = session.metadata ?? {}
 
+        let priceId: string | null = null
+        let plan: string | null = null
+        if (subscriptionId) {
+          try {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+            priceId = subscription.items?.data?.[0]?.price?.id ?? null
+            plan = priceId ? (PRICE_MAP[priceId] ?? null) : null
+          } catch (err) {
+            console.error('[stripe/webhook] failed to fetch subscription', err)
+          }
+        }
+
         let userId = metadata.supabase_user_id as string | undefined
         if (!userId) {
           try {
@@ -58,7 +70,12 @@ export async function POST(req: Request) {
         if (userId) {
           const { error } = await supabase
             .from('user_profiles')
-            .update({ stripe_customer_id: customerId, stripe_subscription_id: subscriptionId })
+            .update({
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscriptionId,
+              stripe_price_id: priceId,
+              plan,
+            })
             .eq('id', userId)
           if (error) {
             console.error('[stripe/webhook] failed to update user profile', error)
@@ -73,7 +90,11 @@ export async function POST(req: Request) {
           if (users?.id) {
             const { error } = await supabase
               .from('user_profiles')
-              .update({ stripe_subscription_id: subscriptionId })
+              .update({
+                stripe_subscription_id: subscriptionId,
+                stripe_price_id: priceId,
+                plan,
+              })
               .eq('id', users.id)
             if (error) {
               console.error('[stripe/webhook] failed to update user profile', error)
@@ -88,47 +109,41 @@ export async function POST(req: Request) {
       // ------------------------------------------------------------------ //
       case 'invoice.payment_succeeded':
       case 'customer.subscription.created':
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as any
-        const customerId = subscription.customer as string
-        const subscriptionId = subscription.id as string
-        const priceId = subscription.items?.data?.[0]?.price?.id as string | undefined
-        const plan = priceId ? (PRICE_MAP[priceId] ?? null) : null
-
-        const { data: userRow } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('stripe_customer_id', customerId)
-          .limit(1)
-          .single()
-        if (userRow?.id) {
-          const { error } = await supabase
-            .from('user_profiles')
-            .update({ stripe_subscription_id: subscriptionId, stripe_price_id: priceId ?? null, plan })
-            .eq('id', userRow.id)
-          if (error) {
-            console.error('[stripe/webhook] failed to update user profile', error)
-          }
-        }
-        break
-      }
-
+      case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as any
         const customerId = subscription.customer as string
+
         const { data: userRow } = await supabase
           .from('user_profiles')
           .select('id')
           .eq('stripe_customer_id', customerId)
           .limit(1)
           .single()
+          
         if (userRow?.id) {
-          const { error } = await supabase
-            .from('user_profiles')
-            .update({ stripe_subscription_id: null, stripe_price_id: null, plan: null })
-            .eq('id', userRow.id)
-          if (error) {
-            console.error('[stripe/webhook] failed to update user profile', error)
+          try {
+            // Re-fetch customer's actual state directly from Stripe instead of relying on this single event.
+            // This cleanly handles cases where they upgrade (have 2 subs momentarily) and delete the old one.
+            const { getSubscriptionForCustomer } = await import('../../../../lib/stripe')
+            const currentSub = await getSubscriptionForCustomer(customerId)
+            
+            const isActive = currentSub.status === 'active' || currentSub.status === 'trialing'
+            
+            const { error } = await supabase
+              .from('user_profiles')
+              .update({ 
+                stripe_subscription_id: isActive ? (currentSub.subscription?.id ?? null) : null,
+                stripe_price_id: isActive ? (currentSub.priceId ?? null) : null,
+                plan: isActive ? (currentSub.planId ?? null) : null
+              })
+              .eq('id', userRow.id)
+            
+            if (error) {
+               console.error('[stripe/webhook] failed to update user profile', error)
+            }
+          } catch (e) {
+            console.error('[stripe/webhook] failed to recalculate subscription state', e)
           }
         }
         break

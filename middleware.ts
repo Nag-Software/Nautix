@@ -55,12 +55,15 @@ export async function middleware(request: NextRequest) {
     try {
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('stripe_subscription_id')
+        .select('stripe_subscription_id,stripe_price_id,plan')
         .eq('id', user.id)
         .limit(1)
         .maybeSingle()
 
-      hasAccess = Boolean((profile as any)?.stripe_subscription_id)
+      const subscriptionId = (profile as any)?.stripe_subscription_id
+      const priceId = (profile as any)?.stripe_price_id
+      const plan = (profile as any)?.plan
+      hasAccess = Boolean(subscriptionId || priceId || plan)
     } catch (e) {
       // Fallback: if profile columns are missing, avoid false redirects for known customers
       try {
