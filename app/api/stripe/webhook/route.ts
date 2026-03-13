@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import stripe from '../../../../lib/stripe'
 import { PRICE_MAP } from '../../../../lib/stripe'
-import { createClient as createSupabaseClient } from '../../../../lib/supabase/server'
+import { createAdminClient } from '../../../../lib/supabase/admin'
 
 // MUST be Node.js runtime — stripe.webhooks.constructEvent() uses Node crypto.
 // Edge runtime has an incompatible crypto polyfill that breaks HMAC verification
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   // Heavy work (email, queues, etc.) should be dispatched here and processed
   // out-of-band. For now we process inline; move to a queue if handlers grow.
   try {
-    const supabase = await createSupabaseClient()
+    const supabase = createAdminClient()
 
     switch (event.type) {
       // ------------------------------------------------------------------ //
@@ -45,11 +45,24 @@ export async function POST(req: Request) {
         const subscriptionId = session.subscription as string
         const metadata = session.metadata ?? {}
 
-        if (metadata.supabase_user_id) {
-          await supabase
+        let userId = metadata.supabase_user_id as string | undefined
+        if (!userId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId)
+            userId = (customer as any)?.metadata?.supabase_user_id
+          } catch (e) {
+            console.error('[stripe/webhook] failed to read customer metadata', e)
+          }
+        }
+
+        if (userId) {
+          const { error } = await supabase
             .from('user_profiles')
             .update({ stripe_customer_id: customerId, stripe_subscription_id: subscriptionId })
-            .eq('id', metadata.supabase_user_id)
+            .eq('id', userId)
+          if (error) {
+            console.error('[stripe/webhook] failed to update user profile', error)
+          }
         } else {
           const { data: users } = await supabase
             .from('user_profiles')
@@ -58,10 +71,13 @@ export async function POST(req: Request) {
             .limit(1)
             .single()
           if (users?.id) {
-            await supabase
+            const { error } = await supabase
               .from('user_profiles')
               .update({ stripe_subscription_id: subscriptionId })
               .eq('id', users.id)
+            if (error) {
+              console.error('[stripe/webhook] failed to update user profile', error)
+            }
           }
         }
         break
@@ -86,10 +102,13 @@ export async function POST(req: Request) {
           .limit(1)
           .single()
         if (userRow?.id) {
-          await supabase
+          const { error } = await supabase
             .from('user_profiles')
             .update({ stripe_subscription_id: subscriptionId, stripe_price_id: priceId ?? null, plan })
             .eq('id', userRow.id)
+          if (error) {
+            console.error('[stripe/webhook] failed to update user profile', error)
+          }
         }
         break
       }
@@ -104,10 +123,13 @@ export async function POST(req: Request) {
           .limit(1)
           .single()
         if (userRow?.id) {
-          await supabase
+          const { error } = await supabase
             .from('user_profiles')
             .update({ stripe_subscription_id: null, stripe_price_id: null, plan: null })
             .eq('id', userRow.id)
+          if (error) {
+            console.error('[stripe/webhook] failed to update user profile', error)
+          }
         }
         break
       }

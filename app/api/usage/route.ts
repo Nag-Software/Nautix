@@ -23,7 +23,15 @@ export async function GET(req: Request) {
     let plan: string | null = null
     let access = false
     try {
-      const { data: profileRow } = await supabase.from('user_profiles').select('stripe_customer_id').eq('id', user.id).limit(1).single()
+      const { data: profileRow } = await supabase
+        .from('user_profiles')
+        .select('stripe_customer_id,stripe_subscription_id')
+        .eq('id', user.id)
+        .limit(1)
+        .single()
+
+      access = Boolean(profileRow?.stripe_subscription_id)
+
       const customerId = profileRow?.stripe_customer_id
       if (customerId) {
         const subInfo = await getSubscriptionForCustomer(customerId)

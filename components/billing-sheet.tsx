@@ -296,8 +296,6 @@ export function BillingSheet({ open, onOpenChange }: BillingSheetProps) {
     }
   }
 
-  // Trial functionality removed
-
   async function handleManage() {
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' })

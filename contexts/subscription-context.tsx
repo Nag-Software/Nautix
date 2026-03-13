@@ -18,20 +18,19 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const pathname = usePathname()
 
   const fetchStatus = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/usage', { cache: 'no-store' })
-      if (!res.ok) {
-        setHasSubscription(false)
-        return
+      setLoading(true)
+      try {
+        const res = await fetch('/api/usage', { cache: 'no-store' })
+        if (!res.ok) {
+          return
+        }
+        const j = await res.json()
+        setHasSubscription(Boolean(j.access))
+      } catch (e) {
+        // keep previous value on errors to avoid false redirects
+      } finally {
+        setLoading(false)
       }
-      const j = await res.json()
-      setHasSubscription(Boolean(j.access))
-    } catch (e) {
-      setHasSubscription(false)
-    } finally {
-      setLoading(false)
-    }
   }
 
   useEffect(() => {

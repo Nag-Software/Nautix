@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getSubscriptionForCustomer } from '@/lib/stripe'
 
 // Paths that must be completely skipped by auth middleware.
 // Stripe (and any other server-to-server webhooks) must never hit auth redirects.
@@ -50,41 +49,34 @@ export async function middleware(request: NextRequest) {
   }
 
   // Determine subscription/access status for signed-in users
+  // NOTE: Middleware runs in the Edge runtime. Avoid Stripe SDK calls here.
   let hasAccess = false
   if (user) {
     try {
-      // Use stored stripe_customer_id and derive plan & access directly from Stripe
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('stripe_customer_id')
+        .select('stripe_subscription_id')
         .eq('id', user.id)
         .limit(1)
         .maybeSingle()
 
-      const customerId = (profile as any)?.stripe_customer_id ?? null
-
-      // Debug: log profile info
-      // eslint-disable-next-line no-console
-      console.log('[middleware] profile fetched', { userId: user.id, customerId })
-
-      if (customerId) {
-        try {
-          const subInfo = await getSubscriptionForCustomer(customerId)
-          // eslint-disable-next-line no-console
-          console.log('[middleware] subscription info', { userId: user.id, status: subInfo.status, planId: subInfo.planId })
-          if (subInfo.status === 'active' || subInfo.status === 'trialing') {
-            hasAccess = true
-          }
-        } catch (e) {
-          // If stripe check fails, be conservative and leave hasAccess as false
-          // eslint-disable-next-line no-console
-          console.error('[middleware] stripe check failed for user', user.id, e)
-        }
-      }
+      hasAccess = Boolean((profile as any)?.stripe_subscription_id)
     } catch (e) {
-      // ignore and treat as no access
-      // eslint-disable-next-line no-console
-      console.error('[middleware] error fetching profile for user', user.id, e)
+      // Fallback: if profile columns are missing, avoid false redirects for known customers
+      try {
+        const { data: profileFallback } = await supabase
+          .from('user_profiles')
+          .select('stripe_customer_id')
+          .eq('id', user.id)
+          .limit(1)
+          .maybeSingle()
+
+        hasAccess = Boolean((profileFallback as any)?.stripe_customer_id)
+      } catch (fallbackErr) {
+        // ignore and treat as no access
+        // eslint-disable-next-line no-console
+        console.error('[middleware] error fetching profile for user', user.id, fallbackErr)
+      }
     }
   }
 
@@ -110,6 +102,8 @@ export async function middleware(request: NextRequest) {
 
   // If user is signed in but has no subscription/access, redirect to /nosub
   if (user && !hasAccess) {
+    const subscriptionSuccess = request.nextUrl.searchParams.get('subscription') === 'success'
+    if (subscriptionSuccess) return supabaseResponse
     const allowedFromNoSub = ['/nosub', '/login', '/signup', '/reset-password', '/sjefen']
     const isAllowed = allowedFromNoSub.some((p) => request.nextUrl.pathname.startsWith(p))
     if (!isAllowed) {
@@ -117,6 +111,13 @@ export async function middleware(request: NextRequest) {
       url.pathname = '/nosub'
       return NextResponse.redirect(url)
     }
+  }
+
+  // If user has access, prevent visiting /nosub
+  if (user && hasAccess && request.nextUrl.pathname.startsWith('/nosub')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
   // Check admin access for /sjefen route
